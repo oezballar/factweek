@@ -22,7 +22,7 @@ The repository is deliberately built as a Spring Modulith modular monolith: one 
 | `technology` | Own the reviewed technology-fact domain and publication rules |
 | `briefing` | Select the current weekly briefing and apply explicit category filters |
 
-See [the product brief](docs/product/product-brief.md) and [ADR 0001](docs/architecture/adr-0001-modular-monolith.md).
+See [the product brief](docs/product/product-brief.md), [ADR 0001](docs/architecture/adr-0001-modular-monolith.md), [ADR 0002](docs/architecture/adr-0002-scheduling-and-ai-tooling.md), and [the living project plan](docs/product/project-plan.md).
 
 ## Local development
 
@@ -103,6 +103,13 @@ curl 'http://localhost:8080/api/v1/briefings/technology/current?categories=AI_AN
 - AI integrations must return typed data and be evaluated.
 - A new infrastructure component needs a demonstrated use case.
 
+## Planned tooling
+
+- Spring Scheduling is the intended later solution for configurable scheduled GDELT imports; the manual import endpoint remains available.
+- Spring AI is planned for structured fact-proposal extraction behind an application-owned port.
+- Embabel is only an optional future evaluation for demonstrated multi-step or agentic needs.
+- n8n and Flowise are not part of the planned architecture.
+
 ## Next slice
 
-Add a small candidate-review endpoint, then introduce Spring AI structured extraction behind an application port. Embabel, n8n, Flowise, and Neo4j intentionally remain outside the first runnable slice.
+Retrieve and persist source content for stored candidates. Structured extraction with Spring AI follows once reproducible source content is available.
