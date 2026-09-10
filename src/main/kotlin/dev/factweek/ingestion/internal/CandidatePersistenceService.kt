@@ -1,6 +1,7 @@
 package dev.factweek.ingestion.internal
 
 import dev.factweek.ingestion.GdeltCandidate
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.net.URI
@@ -11,22 +12,34 @@ import java.util.Locale
 @Transactional
 internal class CandidatePersistenceService(
     private val repository: NewsCandidateRepository,
+    private val candidateWriter: CandidateWriter,
 ) {
     fun storeDiscovered(candidates: Collection<GdeltCandidate>): List<NewsCandidateEntity> =
         candidates.map { storeDiscovered(it) }
 
     fun storeDiscovered(candidate: GdeltCandidate): NewsCandidateEntity {
         val canonicalUrl = canonicalize(candidate.url)
-        return repository.findByCanonicalUrl(canonicalUrl) ?: repository.save(
-            NewsCandidateEntity(
-                canonicalUrl = canonicalUrl,
-                title = candidate.title.trim(),
-                sourceDomain = sourceDomain(candidate.url),
-                publishedAt = candidate.discoveredAt,
-                fetchedAt = Instant.now(),
-                status = CandidateStatus.DISCOVERED,
-            ),
+        repository.findByCanonicalUrl(canonicalUrl)?.let { return it }
+
+        val entity = NewsCandidateEntity(
+            canonicalUrl = canonicalUrl,
+            title = candidate.title.trim(),
+            sourceDomain = sourceDomain(candidate.url),
+            publishedAt = candidate.discoveredAt,
+            fetchedAt = Instant.now(),
+            status = CandidateStatus.DISCOVERED,
         )
+
+        return try {
+            candidateWriter.insert(entity)
+        } catch (_: DataIntegrityViolationException) {
+            // A separate transaction is deliberately used for the insert. A unique-key
+            // violation marks that transaction rollback-only, while this transaction can
+            // still read and return the row inserted by the concurrent caller.
+            requireNotNull(repository.findByCanonicalUrl(canonicalUrl)) {
+                "Candidate insert failed but no candidate exists for $canonicalUrl"
+            }
+        }
     }
 
     private fun canonicalize(url: URI): String {
