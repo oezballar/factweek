@@ -9,10 +9,12 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Duration
 import java.util.zip.GZIPInputStream
+import java.util.Locale
 
 @Component
 internal class HttpSourceContentFetcher(
@@ -22,8 +24,17 @@ internal class HttpSourceContentFetcher(
     @Value("\${factweek.source-content.maximum-download-size:2097152}") private val maximumDownloadSize: Int,
     @Value("\${factweek.source-content.maximum-stored-text-length:100000}") private val maximumStoredTextLength: Int,
     @Value("\${factweek.source-content.maximum-redirects:5}") private val maximumRedirects: Int,
-    @Value("\${factweek.source-content.user-agent:Factweek/0.1 (+https://github.com/factweek/factweek)}") private val userAgent: String,
+    @Value("\${factweek.source-content.user-agent:Factweek/0.1 (+https://github.com/oezballar/factweek)}") private val userAgent: String,
 ) : SourceContentFetcher {
+    init {
+        require(connectTimeout.isPositive) { "connectTimeout must be positive" }
+        require(requestTimeout.isPositive) { "requestTimeout must be positive" }
+        require(maximumDownloadSize > 0) { "maximumDownloadSize must be positive" }
+        require(maximumStoredTextLength > 0) { "maximumStoredTextLength must be positive" }
+        require(maximumRedirects >= 0) { "maximumRedirects must not be negative" }
+        require(userAgent.isNotBlank()) { "userAgent must not be blank" }
+    }
+
     private val client = HttpClient.newBuilder()
         .connectTimeout(connectTimeout)
         .followRedirects(HttpClient.Redirect.NEVER)
@@ -34,30 +45,14 @@ internal class HttpSourceContentFetcher(
         repeat(maximumRedirects + 1) { redirectCount ->
             urlValidator.validate(currentUrl)
             val response = send(currentUrl)
-            if (response.statusCode() in REDIRECTS) {
-                response.body().close()
-                if (redirectCount == maximumRedirects) throw SourceContentFetchException(SourceContentFailureReason.TOO_MANY_REDIRECTS)
-                val location = response.headers().firstValue("Location").orElseThrow {
-                    SourceContentFetchException(SourceContentFailureReason.HTTP_ERROR)
+            val outcome = response.body().use { body -> processResponse(currentUrl, response, body) }
+            when (outcome) {
+                is FetchOutcome.Redirect -> {
+                    if (redirectCount == maximumRedirects) throw SourceContentFetchException(SourceContentFailureReason.TOO_MANY_REDIRECTS)
+                    currentUrl = currentUrl.resolve(outcome.location)
                 }
-                currentUrl = currentUrl.resolve(location)
-                return@repeat
+                is FetchOutcome.Success -> return outcome.result
             }
-            if (response.statusCode() !in 200..299) throw SourceContentFetchException(SourceContentFailureReason.HTTP_ERROR)
-
-            val mediaType = response.headers().firstValue("Content-Type").orElse("")
-                .substringBefore(';').trim().lowercase()
-            if (mediaType !in setOf("text/html", "application/xhtml+xml")) {
-                throw SourceContentFetchException(SourceContentFailureReason.UNSUPPORTED_MEDIA_TYPE)
-            }
-            val contentLength = response.headers().firstValue("Content-Length").orElse(null)?.toLongOrNull()
-            if (contentLength != null && contentLength > maximumDownloadSize) {
-                throw SourceContentFetchException(SourceContentFailureReason.CONTENT_TOO_LARGE)
-            }
-            val text = extractText(readBody(response))
-            if (text.length < MINIMUM_USABLE_TEXT_LENGTH) throw SourceContentFetchException(SourceContentFailureReason.EMPTY_CONTENT)
-            val storedText = text.take(maximumStoredTextLength)
-            return SourceContentFetchResult(currentUrl, mediaType, response.statusCode(), storedText, sha256(storedText))
         }
         throw SourceContentFetchException(SourceContentFailureReason.TOO_MANY_REDIRECTS)
     }
@@ -81,15 +76,37 @@ internal class HttpSourceContentFetcher(
         throw SourceContentFetchException(SourceContentFailureReason.NETWORK_ERROR)
     } catch (exception: InterruptedException) {
         Thread.currentThread().interrupt()
-        throw SourceContentFetchException(SourceContentFailureReason.NETWORK_ERROR)
+        throw IllegalStateException("Source-content request interrupted", exception)
     }
 
-    private fun readBody(response: HttpResponse<InputStream>): String {
-        val input = response.body().let {
-            if (response.headers().firstValue("Content-Encoding").orElse("").equals("gzip", ignoreCase = true)) GZIPInputStream(it) else it
+    private fun processResponse(url: URI, response: HttpResponse<InputStream>, body: InputStream): FetchOutcome {
+        if (response.statusCode() in REDIRECTS) {
+            val location = response.headers().firstValue("Location").orElseThrow {
+                SourceContentFetchException(SourceContentFailureReason.HTTP_ERROR)
+            }
+            return FetchOutcome.Redirect(location)
         }
-        val bytes = input.use { readLimited(it) }
-        return bytes.toString(StandardCharsets.UTF_8)
+        if (response.statusCode() !in 200..299) throw SourceContentFetchException(SourceContentFailureReason.HTTP_ERROR)
+        val contentType = response.headers().firstValue("Content-Type").orElse("")
+        val mediaType = contentType.substringBefore(';').trim().lowercase(Locale.ROOT)
+        if (mediaType !in setOf("text/html", "application/xhtml+xml")) throw SourceContentFetchException(SourceContentFailureReason.UNSUPPORTED_MEDIA_TYPE)
+        val contentLength = response.headers().firstValue("Content-Length").orElse(null)?.toLongOrNull()
+        if (contentLength != null && contentLength > maximumDownloadSize) throw SourceContentFetchException(SourceContentFailureReason.CONTENT_TOO_LARGE)
+        val text = extractText(readBody(body, response, charset(contentType)))
+        if (text.length < MINIMUM_USABLE_TEXT_LENGTH) throw SourceContentFetchException(SourceContentFailureReason.EMPTY_CONTENT)
+        val storedText = text.take(maximumStoredTextLength)
+        return FetchOutcome.Success(SourceContentFetchResult(url, mediaType, response.statusCode(), storedText, sha256(storedText)))
+    }
+
+    private fun readBody(body: InputStream, response: HttpResponse<InputStream>, charset: Charset): String {
+        val input = if (response.headers().firstValue("Content-Encoding").orElse("").equals("gzip", ignoreCase = true)) GZIPInputStream(body) else body
+        val bytes = if (input === body) readLimited(input) else input.use { readLimited(it) }
+        return bytes.toString(charset)
+    }
+
+    private fun charset(contentType: String): Charset {
+        val value = CHARSET_PARAMETER.find(contentType)?.groupValues?.get(1)?.trim()?.trim('"', '\'') ?: return StandardCharsets.UTF_8
+        return runCatching { Charset.forName(value) }.getOrDefault(StandardCharsets.UTF_8)
     }
 
     private fun readLimited(input: InputStream): ByteArray {
@@ -123,5 +140,11 @@ internal class HttpSourceContentFetcher(
     private companion object {
         val REDIRECTS = setOf(301, 302, 303, 307, 308)
         const val MINIMUM_USABLE_TEXT_LENGTH = 40
+        val CHARSET_PARAMETER = Regex("(?:^|;)\\s*charset\\s*=\\s*([^;]+)", RegexOption.IGNORE_CASE)
+    }
+
+    private sealed interface FetchOutcome {
+        data class Redirect(val location: String) : FetchOutcome
+        data class Success(val result: SourceContentFetchResult) : FetchOutcome
     }
 }

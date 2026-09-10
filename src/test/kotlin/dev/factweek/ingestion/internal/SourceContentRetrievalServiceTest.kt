@@ -4,6 +4,7 @@ import dev.factweek.ingestion.GdeltCandidate
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -41,6 +42,7 @@ class SourceContentRetrievalServiceTest {
         documents.deleteAll()
         candidateRepository.deleteAll()
         fetcher.failPaths = emptySet()
+        fetcher.unexpectedPaths = emptySet()
         fetcher.calls.clear()
     }
 
@@ -74,19 +76,43 @@ class SourceContentRetrievalServiceTest {
 
         assertEquals(1, first.fetchedCount)
         assertEquals(1, first.failedCount)
-        assertEquals(1, skipped.selectedCount)
-        assertEquals(1, skipped.skippedCount)
+        assertEquals(0, skipped.selectedCount)
+        assertEquals(0, skipped.skippedCount)
         assertEquals(1, retried.fetchedCount)
         assertEquals(2, documents.count())
         assertEquals(3, fetcher.calls.size)
     }
 
-    private fun candidate(path: String) = GdeltCandidate(
+    @Test
+    fun `prioritizes never fetched candidates over many failed candidates`() {
+        repeat(10) { index -> candidates.storeDiscovered(candidate("failed-$index", Instant.parse("2026-09-01T00:00:00Z"))) }
+        fetcher.failPaths = (0 until 10).map { "failed-$it" }.toSet()
+        service.retrieve(10, retryFailed = false)
+        candidates.storeDiscovered(candidate("new", Instant.parse("2026-09-10T00:00:00Z")))
+        fetcher.calls.clear()
+
+        val result = service.retrieve(2, retryFailed = true)
+
+        assertEquals(2, result.selectedCount)
+        assertEquals("/new", fetcher.calls.first())
+    }
+
+    @Test
+    fun `propagates unexpected fetcher failures without persisting a failed document`() {
+        val candidate = candidates.storeDiscovered(candidate("unexpected"))
+        fetcher.unexpectedPaths = setOf("unexpected")
+
+        assertThrows<IllegalStateException> { service.retrieve(10, retryFailed = false) }
+
+        assertEquals(false, documents.existsById(candidate.id))
+    }
+
+    private fun candidate(path: String, discoveredAt: Instant = Instant.parse("2026-09-01T12:00:00Z")) = GdeltCandidate(
         title = "Candidate $path",
         url = URI.create("https://example.org/$path"),
         sourceCountry = "DE",
         language = "de",
-        discoveredAt = Instant.parse("2026-09-01T12:00:00Z"),
+        discoveredAt = discoveredAt,
     )
 
     @SpringBootConfiguration
@@ -109,10 +135,12 @@ class SourceContentRetrievalServiceTest {
 
     internal class StubFetcher : SourceContentFetcher {
         var failPaths: Set<String> = emptySet()
+        var unexpectedPaths: Set<String> = emptySet()
         val calls = mutableListOf<String>()
 
         override fun fetch(sourceUrl: URI): SourceContentFetchResult {
             calls += sourceUrl.path
+            if (sourceUrl.path.removePrefix("/") in unexpectedPaths) throw IllegalStateException("unexpected test failure")
             if (sourceUrl.path.removePrefix("/") in failPaths) throw SourceContentFetchException(SourceContentFailureReason.HTTP_ERROR)
             val text = "Stored source content for ${sourceUrl.path.removePrefix("/")} with enough useful words."
             return SourceContentFetchResult(sourceUrl, "text/html", 200, text, "a".repeat(64))

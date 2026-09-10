@@ -2,14 +2,13 @@ package dev.factweek.ingestion.internal
 
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
-import org.springframework.data.domain.Sort
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import java.net.URI
 
 @Service
 internal class SourceContentRetrievalService(
     private val candidates: NewsCandidateRepository,
-    private val documents: SourceDocumentRepository,
     private val fetcher: SourceContentFetcher,
     private val persistence: SourceDocumentPersistenceService,
     meterRegistry: MeterRegistry,
@@ -20,30 +19,22 @@ internal class SourceContentRetrievalService(
 
     fun retrieve(maximum: Int, retryFailed: Boolean): SourceContentRetrievalResult {
         if (maximum !in 1..25) throw InvalidSourceContentFetchRequestException()
-        val selected = candidates.findAll(
-            Sort.by(Sort.Order.asc("publishedAt").nullsLast(), Sort.Order.asc("id")),
-        ).asSequence()
-            .filter { documents.findById(it.id).orElse(null)?.status != SourceDocumentStatus.FETCHED }
-            .take(maximum)
-            .toList()
+        val selected = candidates.findForSourceContentRetrieval(
+            retryFailed = retryFailed,
+            fetchedStatus = SourceDocumentStatus.FETCHED,
+            failedStatus = SourceDocumentStatus.FAILED,
+            pageable = PageRequest.of(0, maximum),
+        )
 
         var fetched = 0
         var failed = 0
-        var skipped = 0
+        val skipped = 0
         selected.forEach { candidate ->
-            val existing = documents.findById(candidate.id).orElse(null)
-            if (existing?.status == SourceDocumentStatus.FAILED && !retryFailed) {
-                skipped++
-                return@forEach
-            }
             try {
                 persistence.recordSuccess(candidate, fetcher.fetch(URI(candidate.canonicalUrl)))
                 fetched++
             } catch (exception: SourceContentFetchException) {
                 persistence.recordFailure(candidate, exception.reason)
-                failed++
-            } catch (_: Exception) {
-                persistence.recordFailure(candidate, SourceContentFailureReason.NETWORK_ERROR)
                 failed++
             }
         }

@@ -61,8 +61,42 @@ class HttpSourceContentFetcherTest {
         server.start()
         assertReason(SourceContentFailureReason.TOO_MANY_REDIRECTS) { fetcher(maximumRedirects = 1).fetch(url(server, "/one")) }
         val validator = PublicSourceUrlValidator()
-        listOf("http://localhost", "http://127.0.0.1", "http://10.0.0.1", "http://192.168.1.1", "http://[::1]", "http://[fc00::1]").forEach {
+        listOf(
+            "http://localhost", "http://0.0.0.1", "http://10.0.0.1", "http://100.64.0.1", "http://127.0.0.1",
+            "http://169.254.0.1", "http://172.16.0.1", "http://192.0.2.1", "http://192.168.1.1",
+            "http://198.18.0.1", "http://198.51.100.1", "http://203.0.113.1", "http://240.0.0.1",
+            "http://[::1]", "http://[fc00::1]", "http://[fe80::1]", "http://[ff02::1]",
+        ).forEach {
             assertReason(SourceContentFailureReason.UNSAFE_URL) { validator.validate(URI(it)) }
+        }
+        validator.validate(URI("http://8.8.8.8"))
+    }
+
+    @Test
+    fun `uses the declared HTML charset and defaults safely for invalid charsets`() = withServer { server ->
+        server.createContext("/latin1") { exchange ->
+            respondBytes(exchange, 200, "text/html; charset=ISO-8859-1", "<html><body><main>Café source content with enough meaningful text for extraction.</main></body></html>".toByteArray(Charsets.ISO_8859_1))
+        }
+        server.createContext("/invalid-charset") { exchange ->
+            respond(exchange, 200, "text/html; charset=not-a-charset", "<html><body><main>UTF-8 fallback content with enough meaningful text.</main></body></html>")
+        }
+        server.start()
+        assertEquals("Café source content with enough meaningful text for extraction.", fetcher().fetch(url(server, "/latin1")).extractedText)
+        assertEquals("UTF-8 fallback content with enough meaningful text.", fetcher().fetch(url(server, "/invalid-charset")).extractedText)
+    }
+
+    @Test
+    fun `rejects unsafe adapter configuration`() {
+        assertThrows<IllegalArgumentException> { fetcher(maximumDownloadSize = 0) }
+        assertThrows<IllegalArgumentException> { fetcher(maximumRedirects = -1) }
+        assertThrows<IllegalArgumentException> {
+            HttpSourceContentFetcher(AllowLocalValidator, Duration.ZERO, Duration.ofSeconds(1), 1, 1, 0, "Factweek-test")
+        }
+        assertThrows<IllegalArgumentException> {
+            HttpSourceContentFetcher(AllowLocalValidator, Duration.ofSeconds(1), Duration.ZERO, 1, 1, 0, "Factweek-test")
+        }
+        assertThrows<IllegalArgumentException> {
+            HttpSourceContentFetcher(AllowLocalValidator, Duration.ofSeconds(1), Duration.ofSeconds(1), 1, 1, 0, " ")
         }
     }
 
@@ -89,9 +123,13 @@ class HttpSourceContentFetcherTest {
     private fun html(exchange: com.sun.net.httpserver.HttpExchange, body: String) = respond(exchange, 200, "text/html; charset=utf-8", body)
 
     private fun respond(exchange: com.sun.net.httpserver.HttpExchange, status: Int, type: String, body: String) {
+        respondBytes(exchange, status, type, body.toByteArray())
+    }
+
+    private fun respondBytes(exchange: com.sun.net.httpserver.HttpExchange, status: Int, type: String, body: ByteArray) {
         exchange.responseHeaders.add("Content-Type", type)
-        exchange.sendResponseHeaders(status, body.toByteArray().size.toLong())
-        exchange.responseBody.use { it.write(body.toByteArray()) }
+        exchange.sendResponseHeaders(status, body.size.toLong())
+        exchange.responseBody.use { it.write(body) }
     }
 
     private fun assertReason(reason: SourceContentFailureReason, action: () -> Unit) {
