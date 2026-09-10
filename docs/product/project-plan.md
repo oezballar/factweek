@@ -45,8 +45,8 @@ Deliver a personalized weekly briefing of relevant, evidenced technology changes
 - Candidate persistence: complete.
 - Concurrency-safe deduplication: complete.
 - Manual GDELT import: complete.
-- Source-content retrieval: next milestone.
-- Structured fact extraction: planned after source-content retrieval.
+- Source-content retrieval: complete.
+- Structured fact extraction: next milestone.
 - Human review workflow: planned.
 - Weekly briefing from reviewed facts: basic structure exists; the complete vertical slice is planned.
 - Golden Dataset and evaluation: planned.
@@ -67,6 +67,7 @@ Deliver a personalized weekly briefing of relevant, evidenced technology changes
 
 - Import success and failure rate, candidate discovery count, and deduplication rate.
 - Source-content retrieval completeness and reproducibility.
+- Source-content retrieval must account for the residual DNS-rebinding risk; a future public or multi-tenant deployment should evaluate controlled egress.
 - Fact-proposal schema validity and evidence coverage.
 - Golden-Dataset extraction quality, including precision, recall, and review agreement.
 - Time from candidate discovery to reviewed briefing inclusion.
@@ -82,4 +83,4 @@ Deliver a personalized weekly briefing of relevant, evidenced technology changes
 
 ## Next milestone
 
-Retrieve and persist the actual source content for stored candidates in a controlled, reproducible way. Structured extraction with Spring AI starts only after source content is available.
+Extract structured fact proposals with Spring AI from reproducibly stored source content. The stored content and extracted proposals are not verified facts and remain subject to validation and review.

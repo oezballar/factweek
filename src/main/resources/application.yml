@@ -17,6 +17,13 @@ factweek:
     base-url: ${GDELT_BASE_URL:https://api.gdeltproject.org}
     connect-timeout: ${GDELT_CONNECT_TIMEOUT:5s}
     read-timeout: ${GDELT_READ_TIMEOUT:15s}
+  source-content:
+    connect-timeout: ${SOURCE_CONTENT_CONNECT_TIMEOUT:5s}
+    request-timeout: ${SOURCE_CONTENT_REQUEST_TIMEOUT:15s}
+    maximum-download-size: ${SOURCE_CONTENT_MAXIMUM_DOWNLOAD_SIZE:2097152}
+    maximum-stored-text-length: ${SOURCE_CONTENT_MAXIMUM_STORED_TEXT_LENGTH:100000}
+    maximum-redirects: ${SOURCE_CONTENT_MAXIMUM_REDIRECTS:5}
+    user-agent: ${SOURCE_CONTENT_USER_AGENT:Factweek/0.1 (+https://github.com/factweek/factweek)}
 
 management:
   endpoints:

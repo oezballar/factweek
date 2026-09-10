@@ -62,6 +62,14 @@ Preview unverified GDELT candidates without storing them:
 curl 'http://localhost:8080/api/v1/ingestion/gdelt/candidates?query=technology&maximum=25'
 ```
 
+Retrieve source content for stored candidates without exposing the stored text publicly:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/ingestion/source-content/fetches?maximum=10'
+```
+
+Stored source content is input material for later evaluation and extraction; it is not a verified fact. Source URLs are checked before every request, including redirects. DNS resolution checks cannot prevent every possible DNS-rebinding scenario; a future public or multi-tenant deployment should evaluate controlled egress.
+
 Read the current reviewed briefing:
 
 ```bash
@@ -112,4 +120,4 @@ curl 'http://localhost:8080/api/v1/briefings/technology/current?categories=AI_AN
 
 ## Next slice
 
-Retrieve and persist source content for stored candidates. Structured extraction with Spring AI follows once reproducible source content is available.
+Structured extraction of fact proposals with Spring AI, using the reproducibly stored source content. The resulting proposals still require validation and human review.
