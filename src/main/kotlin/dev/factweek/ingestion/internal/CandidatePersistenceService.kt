@@ -17,9 +17,13 @@ internal class CandidatePersistenceService(
     fun storeDiscovered(candidates: Collection<GdeltCandidate>): List<NewsCandidateEntity> =
         candidates.map { storeDiscovered(it) }
 
-    fun storeDiscovered(candidate: GdeltCandidate): NewsCandidateEntity {
+    fun storeDiscovered(candidate: GdeltCandidate): NewsCandidateEntity = storeDiscoveredWithOutcome(candidate).candidate
+
+    fun storeDiscoveredWithOutcome(candidate: GdeltCandidate): CandidatePersistenceResult {
         val canonicalUrl = canonicalize(candidate.url)
-        repository.findByCanonicalUrl(canonicalUrl)?.let { return it }
+        repository.findByCanonicalUrl(canonicalUrl)?.let {
+            return CandidatePersistenceResult(it, CandidatePersistenceOutcome.EXISTING)
+        }
 
         val entity = NewsCandidateEntity(
             canonicalUrl = canonicalUrl,
@@ -31,14 +35,17 @@ internal class CandidatePersistenceService(
         )
 
         return try {
-            candidateWriter.insert(entity)
+            CandidatePersistenceResult(candidateWriter.insert(entity), CandidatePersistenceOutcome.STORED)
         } catch (_: DataIntegrityViolationException) {
             // A separate transaction is deliberately used for the insert. A unique-key
             // violation marks that transaction rollback-only, while this transaction can
             // still read and return the row inserted by the concurrent caller.
-            requireNotNull(repository.findByCanonicalUrl(canonicalUrl)) {
-                "Candidate insert failed but no candidate exists for $canonicalUrl"
-            }
+            CandidatePersistenceResult(
+                requireNotNull(repository.findByCanonicalUrl(canonicalUrl)) {
+                    "Candidate insert failed but no candidate exists for $canonicalUrl"
+                },
+                CandidatePersistenceOutcome.EXISTING,
+            )
         }
     }
 
@@ -62,4 +69,14 @@ internal class CandidatePersistenceService(
         requireNotNull(url.host) { "Candidate URL must contain a host" }
             .lowercase(Locale.ROOT)
             .removePrefix("www.")
+}
+
+internal data class CandidatePersistenceResult(
+    val candidate: NewsCandidateEntity,
+    val outcome: CandidatePersistenceOutcome,
+)
+
+internal enum class CandidatePersistenceOutcome {
+    STORED,
+    EXISTING,
 }

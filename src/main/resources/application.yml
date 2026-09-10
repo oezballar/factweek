@@ -12,6 +12,12 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+factweek:
+  gdelt:
+    base-url: ${GDELT_BASE_URL:https://api.gdeltproject.org}
+    connect-timeout: ${GDELT_CONNECT_TIMEOUT:5s}
+    read-timeout: ${GDELT_READ_TIMEOUT:15s}
+
 management:
   endpoints:
     web:
