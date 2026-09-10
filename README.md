@@ -44,7 +44,19 @@ The application uses `jdbc:postgresql://localhost:5432/factweek` by default. Ove
 
 ## Current vertical slice
 
-Fetch unverified GDELT candidates:
+Import unverified GDELT candidates into the candidate store (this creates candidates, not reviewed or verified technology facts):
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/ingestion/gdelt/imports?query=technology&maximum=25'
+```
+
+The import defaults to the preceding seven days. An explicit UTC time window can be supplied:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/ingestion/gdelt/imports?query=technology&maximum=25&from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z'
+```
+
+Preview unverified GDELT candidates without storing them:
 
 ```bash
 curl 'http://localhost:8080/api/v1/ingestion/gdelt/candidates?query=technology&maximum=25'
@@ -93,4 +105,4 @@ curl 'http://localhost:8080/api/v1/briefings/technology/current?categories=AI_AN
 
 ## Next slice
 
-Add candidate persistence and a small review endpoint, then introduce Spring AI structured extraction behind an application port. Embabel, n8n, Flowise, and Neo4j intentionally remain outside the first runnable slice.
+Add a small candidate-review endpoint, then introduce Spring AI structured extraction behind an application port. Embabel, n8n, Flowise, and Neo4j intentionally remain outside the first runnable slice.
