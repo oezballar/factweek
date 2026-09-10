@@ -49,7 +49,7 @@ internal class HttpSourceContentFetcher(
             when (outcome) {
                 is FetchOutcome.Redirect -> {
                     if (redirectCount == maximumRedirects) throw SourceContentFetchException(SourceContentFailureReason.TOO_MANY_REDIRECTS)
-                    currentUrl = currentUrl.resolve(outcome.location)
+                    currentUrl = resolveRedirect(currentUrl, outcome.location)
                 }
                 is FetchOutcome.Success -> return outcome.result
             }
@@ -69,8 +69,6 @@ internal class HttpSourceContentFetcher(
             HttpResponse.BodyHandlers.ofInputStream(),
         )
     } catch (exception: java.net.http.HttpTimeoutException) {
-        throw SourceContentFetchException(SourceContentFailureReason.TIMEOUT)
-    } catch (exception: java.net.http.HttpConnectTimeoutException) {
         throw SourceContentFetchException(SourceContentFailureReason.TIMEOUT)
     } catch (exception: java.io.IOException) {
         throw SourceContentFetchException(SourceContentFailureReason.NETWORK_ERROR)
@@ -96,6 +94,12 @@ internal class HttpSourceContentFetcher(
         if (text.length < MINIMUM_USABLE_TEXT_LENGTH) throw SourceContentFetchException(SourceContentFailureReason.EMPTY_CONTENT)
         val storedText = text.take(maximumStoredTextLength)
         return FetchOutcome.Success(SourceContentFetchResult(url, mediaType, response.statusCode(), storedText, sha256(storedText)))
+    }
+
+    private fun resolveRedirect(baseUrl: URI, location: String): URI = try {
+        baseUrl.resolve(URI(location))
+    } catch (_: Exception) {
+        throw SourceContentFetchException(SourceContentFailureReason.HTTP_ERROR)
     }
 
     private fun readBody(body: InputStream, response: HttpResponse<InputStream>, charset: Charset): String {

@@ -55,6 +55,20 @@ class HttpSourceContentFetcherTest {
     }
 
     @Test
+    fun `classifies an invalid redirect location as an HTTP error`() = withServer { server ->
+        server.createContext("/invalid-location") { exchange ->
+            exchange.responseHeaders.add("Location", "http://[invalid")
+            exchange.sendResponseHeaders(302, -1)
+            exchange.close()
+        }
+        server.start()
+
+        assertReason(SourceContentFailureReason.HTTP_ERROR) {
+            fetcher().fetch(url(server, "/invalid-location"))
+        }
+    }
+
+    @Test
     fun `limits redirect chains and rejects non public addresses`() = withServer { server ->
         server.createContext("/one") { exchange -> exchange.responseHeaders.add("Location", "/two"); exchange.sendResponseHeaders(302, -1); exchange.close() }
         server.createContext("/two") { exchange -> exchange.responseHeaders.add("Location", "/one"); exchange.sendResponseHeaders(302, -1); exchange.close() }
