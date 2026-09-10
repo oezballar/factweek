@@ -12,7 +12,7 @@ Factweek imports unverified source candidates and will later extract structured 
 
 ### Spring Scheduling
 
-Scheduled GDELT imports will be implemented with Spring Scheduling after the manual GDELT import is stable in production. The manual import endpoint remains available for development and operations. The schedule's cron expression, time zone, and activation must be configurable.
+Scheduled GDELT imports will be implemented with Spring Scheduling after the manual GDELT import has been verified as stable through automated tests and reproducible manual runs. The manual import endpoint remains available for development and operations. The schedule's cron expression, time zone, and activation must be configurable.
 
 Scheduling belongs to the `ingestion` module because it triggers ingestion work. While Factweek has one application instance, no distributed lock is required. Before horizontal scaling, the team must evaluate a database-backed lock or a solution such as ShedLock.
 

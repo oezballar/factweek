@@ -44,8 +44,9 @@ Deliver a personalized weekly briefing of relevant, evidenced technology changes
 - PostgreSQL, Flyway, and Testcontainers: complete.
 - Candidate persistence: complete.
 - Concurrency-safe deduplication: complete.
-- Manual GDELT import: complete (merged into local `main`).
-- Structured fact extraction: next planned capability, after source-content retrieval.
+- Manual GDELT import: complete.
+- Source-content retrieval: next milestone.
+- Structured fact extraction: planned after source-content retrieval.
 - Human review workflow: planned.
 - Weekly briefing from reviewed facts: basic structure exists; the complete vertical slice is planned.
 - Golden Dataset and evaluation: planned.
