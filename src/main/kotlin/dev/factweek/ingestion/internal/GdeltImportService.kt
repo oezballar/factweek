@@ -51,10 +51,9 @@ internal class GdeltImportService(
 
     companion object {
         fun validate(query: String, from: Instant, to: Instant, maximum: Int) {
-            require(query.isNotBlank()) { "query must not be blank" }
-            require(from.isBefore(to)) { "from must be before to" }
-            require(maximum in 1..250) { "maximum must be between 1 and 250" }
-            require(Duration.between(from, to) <= Duration.ofDays(7)) { "time window must not exceed seven days" }
+            if (query.isBlank() || !from.isBefore(to) || maximum !in 1..250 || Duration.between(from, to) > Duration.ofDays(7)) {
+                throw InvalidGdeltImportRequestException()
+            }
         }
 
         private val logger = LoggerFactory.getLogger(GdeltImportService::class.java)

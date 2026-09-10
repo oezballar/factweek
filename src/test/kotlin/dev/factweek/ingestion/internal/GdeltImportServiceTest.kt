@@ -70,10 +70,10 @@ class GdeltImportServiceTest {
         val from = Instant.parse("2026-09-01T00:00:00Z")
         val to = Instant.parse("2026-09-02T00:00:00Z")
 
-        assertThrows<IllegalArgumentException> { service.import("technology", to, from, 25) }
-        assertThrows<IllegalArgumentException> { service.import("technology", from, from.plusSeconds(7 * 24 * 60 * 60 + 1), 25) }
-        assertThrows<IllegalArgumentException> { service.import("technology", from, to, 0) }
-        assertThrows<IllegalArgumentException> { service.import("technology", from, to, 251) }
+        assertThrows<InvalidGdeltImportRequestException> { service.import("technology", to, from, 25) }
+        assertThrows<InvalidGdeltImportRequestException> { service.import("technology", from, from.plusSeconds(7 * 24 * 60 * 60 + 1), 25) }
+        assertThrows<InvalidGdeltImportRequestException> { service.import("technology", from, to, 0) }
+        assertThrows<InvalidGdeltImportRequestException> { service.import("technology", from, to, 251) }
         assertEquals(0, candidates.calls)
     }
 

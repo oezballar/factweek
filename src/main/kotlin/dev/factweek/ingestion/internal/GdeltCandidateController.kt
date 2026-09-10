@@ -41,18 +41,25 @@ internal class GdeltCandidateController(
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) to: Instant?,
     ): GdeltImportResult {
         val window = window(from, to)
+        GdeltImportService.validate(query, window.from, window.to, maximum)
         return importService.import(query, window.from, window.to, maximum)
     }
 
-    @ExceptionHandler(IllegalArgumentException::class)
-    fun invalidRequest(exception: IllegalArgumentException): ProblemDetail =
-        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.message ?: "Invalid import request")
+    @ExceptionHandler(InvalidGdeltImportRequestException::class)
+    fun invalidRequest(): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid GDELT import request")
 
     @ExceptionHandler(GdeltRequestException::class)
     fun gdeltUnavailable(): ProblemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, "Unable to retrieve GDELT candidates")
 
     private fun window(from: Instant?, to: Instant?): ImportWindow {
+        if ((from == null) != (to == null)) {
+            throw InvalidGdeltImportRequestException()
+        }
+        if (from != null && to != null) {
+            return ImportWindow(from, to)
+        }
         val resolvedTo = to ?: clock.instant()
         return ImportWindow(from ?: resolvedTo.minus(7, ChronoUnit.DAYS), resolvedTo)
     }

@@ -15,6 +15,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.ZoneOffset
+import java.util.Locale
 
 @Component
 internal class GdeltDocClient(
@@ -59,17 +60,35 @@ internal class GdeltDocClient(
             logger.warn("gdelt_request_failed query={} from={} to={} reason=empty_response", query, from, to)
             throw GdeltRequestException("GDELT returned an empty response")
         }
-        return response.articles.mapNotNull { article ->
-            runCatching {
-                GdeltCandidate(
-                    title = article.title,
-                    url = URI(article.url),
-                    sourceCountry = article.sourcecountry,
-                    language = article.language,
-                    discoveredAt = article.seendate?.let { GDELT_DATE.parse(it, Instant::from) },
-                )
-            }.getOrNull()
+        return response.articles.mapNotNull { article -> article.toCandidateOrNull() }
+    }
+
+    private fun GdeltArticle.toCandidateOrNull(): GdeltCandidate? {
+        val normalizedTitle = title.trim()
+        if (normalizedTitle.isEmpty()) return discard("blank_title")
+
+        val candidateUrl = try {
+            URI(url)
+        } catch (_: Exception) {
+            return discard("invalid_url")
         }
+        val scheme = candidateUrl.scheme?.lowercase(Locale.ROOT)
+        if (!candidateUrl.isAbsolute || candidateUrl.host == null || scheme !in setOf("http", "https")) {
+            return discard("unsupported_url")
+        }
+
+        return GdeltCandidate(
+            title = normalizedTitle,
+            url = candidateUrl,
+            sourceCountry = sourcecountry,
+            language = language,
+            discoveredAt = seendate?.let { runCatching { GDELT_DATE.parse(it, Instant::from) }.getOrNull() },
+        )
+    }
+
+    private fun discard(reason: String): Nothing? {
+        logger.debug("gdelt_article_discarded reason={}", reason)
+        return null
     }
 
     private companion object {
