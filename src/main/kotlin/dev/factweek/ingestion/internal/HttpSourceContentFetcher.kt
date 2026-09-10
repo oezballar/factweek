@@ -97,8 +97,8 @@ internal class HttpSourceContentFetcher(
     }
 
     private fun resolveRedirect(baseUrl: URI, location: String): URI = try {
-        baseUrl.resolve(URI(location))
-    } catch (_: Exception) {
+        baseUrl.resolve(URI.create(location))
+    } catch (_: IllegalArgumentException) {
         throw SourceContentFetchException(SourceContentFailureReason.HTTP_ERROR)
     }
 
