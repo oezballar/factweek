@@ -30,11 +30,13 @@ repositories {
 
 extra["springModulithVersion"] = "2.1.1"
 extra["testcontainersVersion"] = "2.0.5"
+extra["springAiVersion"] = "2.0.1"
 
 dependencyManagement {
     imports {
         mavenBom("org.springframework.modulith:spring-modulith-bom:${property("springModulithVersion")}")
         mavenBom("org.testcontainers:testcontainers-bom:${property("testcontainersVersion")}")
+        mavenBom("org.springframework.ai:spring-ai-bom:${property("springAiVersion")}")
     }
 }
 
@@ -45,6 +47,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.modulith:spring-modulith-starter-core")
+    implementation("org.springframework.ai:spring-ai-starter-model-openai")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.jsoup:jsoup:1.18.3")
