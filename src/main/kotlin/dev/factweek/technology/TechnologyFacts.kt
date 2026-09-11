@@ -5,7 +5,7 @@ import java.time.LocalDate
 /** Public API of the technology module. */
 interface TechnologyFacts {
     fun publish(command: PublishTechnologyFact): TechnologyFact
-    fun publishedBetween(from: LocalDate, to: LocalDate): List<TechnologyFact>
+    fun occurredBetween(from: LocalDate, to: LocalDate): List<TechnologyFact>
 }
 
 data class PublishTechnologyFact(

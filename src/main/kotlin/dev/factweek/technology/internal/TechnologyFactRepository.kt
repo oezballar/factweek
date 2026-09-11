@@ -5,5 +5,5 @@ import java.time.LocalDate
 import java.util.UUID
 
 internal interface TechnologyFactRepository : JpaRepository<TechnologyFactEntity, UUID> {
-    fun findAllByOccurredOnBetweenOrderByOccurredOnDesc(from: LocalDate, to: LocalDate): List<TechnologyFactEntity>
+    fun findAllByOccurredOnBetweenOrderByOccurredOnDescIdAsc(from: LocalDate, to: LocalDate): List<TechnologyFactEntity>
 }
