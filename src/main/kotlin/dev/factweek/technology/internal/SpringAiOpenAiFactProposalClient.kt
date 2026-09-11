@@ -22,7 +22,7 @@ internal class SpringAiOpenAiFactProposalClient(
             .user(prompt.userContent)
             .options(OpenAiRequestOptions.forPrompt(prompt))
             .call()
-            .entity(OpenAiFactProposalResponse::class.java) { specification ->
+            .entity(OpenAiFactProposalStructuredOutput()) { specification ->
                 specification.useProviderStructuredOutput()
             }
 }

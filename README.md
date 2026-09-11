@@ -93,6 +93,8 @@ curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/extractions
 
 Each selected source document causes a billable OpenAI API request. `OPENAI_MODEL`, `OPENAI_PROMPT_VERSION`, `OPENAI_MAX_PROPOSALS_PER_DOCUMENT` (maximum 5), and `OPENAI_MAX_OUTPUT_TOKENS` are optional tuning variables. Do not put a key in configuration files. Disable the adapter by leaving `FACTWEEK_OPENAI_ENABLED` unset or `false` and `SPRING_AI_MODEL_CHAT=none`.
 
+The OpenAI adapter uses a dedicated Strict Structured Outputs schema rather than Spring AI's generated Kotlin DTO schema. Nullable DTO properties with default values are otherwise emitted as optional properties, while OpenAI requires every object property to appear in `required`. The adapter schema instead makes every property required, represents the optional occurrence date as `string | null`, and disables additional properties recursively. A regression test verifies these invariants for every nested object.
+
 `FACTWEEK_OPENAI_SMOKE_TEST=true ./gradlew test --tests dev.factweek.technology.internal.OpenAiFactProposalSmokeTest` runs an explicitly opt-in, billable smoke test; it is skipped by default. Ollama remains a future interchangeable adapter behind the same application port.
 
 Read the current reviewed briefing:
