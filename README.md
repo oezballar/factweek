@@ -77,12 +77,16 @@ Fact-proposal persistence and the Spring-AI OpenAI adapter are available for con
 
 Fact Proposals require an explicit human decision. Their only state transitions are `PROPOSED -> ACCEPTED` and `PROPOSED -> REJECTED`; both decision states are terminal. Accepting creates one traceable TechnologyFact in the same transaction, while rejecting requires a documented reason and creates no fact. The proposal retains the original statement and evidence; its link to the resulting TechnologyFact preserves the review provenance.
 
-Accept a proposal with the reviewer-supplied event classification and readiness. `occurredOn` is required only when the proposal did not already contain a date:
+Accept a proposal with the reviewer-supplied event classification, readiness, and date. The example date is supplied by the reviewer; it is not inferred automatically. `occurredOn` may be omitted only when the proposal already contains an extracted date:
 
 ```bash
 curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/PROPOSAL_ID/accept' \
   -H 'Content-Type: application/json' \
-  -d '{"eventType":"TECHNOLOGY_DEPLOYED","readiness":"PRODUCTION_USE"}'
+  -d '{
+    "eventType": "TECHNOLOGY_DEPLOYED",
+    "readiness": "PRODUCTION_USE",
+    "occurredOn": "2026-09-11"
+  }'
 ```
 
 Reject a proposal with a non-empty reason:

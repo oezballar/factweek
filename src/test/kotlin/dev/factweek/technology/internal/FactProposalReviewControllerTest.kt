@@ -10,6 +10,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.time.Instant
@@ -65,5 +66,27 @@ class FactProposalReviewControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"reason":"Conflict"}"""),
         ).andExpect(status().isConflict)
+    }
+
+    @Test
+    fun `accept maps missing and malformed request bodies to generic problem details`() {
+        val proposalId = UUID.randomUUID()
+
+        mockMvc.perform(
+            post("/api/v1/technology/fact-proposals/$proposalId/accept")
+                .contentType(MediaType.APPLICATION_JSON),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.detail").value("A valid fact-proposal review request body is required"))
+
+        mockMvc.perform(
+            post("/api/v1/technology/fact-proposals/$proposalId/accept")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{not valid json"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.detail").value("A valid fact-proposal review request body is required"))
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -38,6 +39,10 @@ internal class FactProposalReviewController(
 
     @ExceptionHandler(InvalidFactProposalReviewRequestException::class)
     fun invalidRequest(): ProblemDetail = problem(HttpStatus.BAD_REQUEST, "Invalid fact-proposal review request")
+
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun unreadableRequestBody(): ProblemDetail =
+        problem(HttpStatus.BAD_REQUEST, "A valid fact-proposal review request body is required")
 
     @ExceptionHandler(FactProposalNotFoundException::class)
     fun notFound(): ProblemDetail = problem(HttpStatus.NOT_FOUND, "Fact proposal was not found")
