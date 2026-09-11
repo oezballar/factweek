@@ -13,6 +13,9 @@ interface SourceDocuments {
         maximum: Int,
         excludedSourceDocumentIds: Set<UUID>,
     ): List<FetchedSourceDocument>
+
+    /** Returns one successfully fetched document for a review, without exposing a JPA entity. */
+    fun findFetchedById(id: UUID): FetchedSourceDocument?
 }
 
 data class FetchedSourceDocument(

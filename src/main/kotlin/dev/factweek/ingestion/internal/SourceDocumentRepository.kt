@@ -12,4 +12,6 @@ internal interface SourceDocumentRepository : JpaRepository<SourceDocumentEntity
         candidateIds: Collection<UUID>,
         pageable: Pageable,
     ): List<SourceDocumentEntity>
+
+    fun findByCandidateIdAndStatus(candidateId: UUID, status: SourceDocumentStatus): SourceDocumentEntity?
 }

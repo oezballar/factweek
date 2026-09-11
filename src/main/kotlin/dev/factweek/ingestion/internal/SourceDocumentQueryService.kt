@@ -24,14 +24,17 @@ internal class SourceDocumentQueryService(
                 page,
             )
         }
-        return documents.map { document ->
-            FetchedSourceDocument(
-                id = requireNotNull(document.candidateId),
-                sourceUrl = document.sourceUrl,
-                textContent = requireNotNull(document.textContent),
-                contentSha256 = requireNotNull(document.contentSha256),
-                fetchedAt = requireNotNull(document.fetchedAt),
-            )
-        }
+        return documents.map(::toFetchedSourceDocument)
     }
+
+    override fun findFetchedById(id: UUID): FetchedSourceDocument? =
+        repository.findByCandidateIdAndStatus(id, SourceDocumentStatus.FETCHED)?.let(::toFetchedSourceDocument)
+
+    private fun toFetchedSourceDocument(document: SourceDocumentEntity) = FetchedSourceDocument(
+        id = requireNotNull(document.candidateId),
+        sourceUrl = document.sourceUrl,
+        textContent = requireNotNull(document.textContent),
+        contentSha256 = requireNotNull(document.contentSha256),
+        fetchedAt = requireNotNull(document.fetchedAt),
+    )
 }

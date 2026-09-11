@@ -9,6 +9,7 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
 import jakarta.persistence.Id
+import jakarta.persistence.Version
 import jakarta.persistence.CollectionTable
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.Table
@@ -35,11 +36,14 @@ internal class FactProposalEntity(
     @Column(name = "occurred_on") val occurredOn: LocalDate?,
     @Column(name = "evidence_text", nullable = false, length = 2000) val evidenceText: String,
     @Enumerated(EnumType.STRING) @Column(name = "evidence_level", nullable = false, length = 64) val evidenceLevel: EvidenceLevel,
-    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) val status: FactProposalStatus = FactProposalStatus.PROPOSED,
+    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) var status: FactProposalStatus = FactProposalStatus.PROPOSED,
     @Column(name = "extraction_model", nullable = false, length = 255) val extractionModel: String,
     @Column(name = "extraction_schema_version", nullable = false, length = 128) val extractionSchemaVersion: String,
     @Column(name = "created_at", nullable = false) val createdAt: Instant,
-    @Column(name = "rejection_reason", length = 1000) val rejectionReason: String? = null,
+    @Column(name = "rejection_reason", length = 1000) var rejectionReason: String? = null,
+    @Column(name = "reviewed_at") var reviewedAt: Instant? = null,
+    @Column(name = "technology_fact_id") var technologyFactId: UUID? = null,
+    @Version @Column(nullable = false) var version: Long = 0,
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "fact_proposal_entity", joinColumns = [JoinColumn(name = "proposal_id")])
     val entities: MutableList<EntityValue> = mutableListOf(),
