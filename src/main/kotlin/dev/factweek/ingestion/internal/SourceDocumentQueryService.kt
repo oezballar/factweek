@@ -4,12 +4,14 @@ import dev.factweek.ingestion.FetchedSourceDocument
 import dev.factweek.ingestion.SourceDocuments
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
 internal class SourceDocumentQueryService(
     private val repository: SourceDocumentRepository,
 ) : SourceDocuments {
+    @Transactional(readOnly = true)
     override fun findFetchedForFactProposals(
         maximum: Int,
         excludedSourceDocumentIds: Set<UUID>,
@@ -27,6 +29,7 @@ internal class SourceDocumentQueryService(
         return documents.map(::toFetchedSourceDocument)
     }
 
+    @Transactional(readOnly = true)
     override fun findFetchedById(id: UUID): FetchedSourceDocument? =
         repository.findByCandidateIdAndStatus(id, SourceDocumentStatus.FETCHED)?.let(::toFetchedSourceDocument)
 
