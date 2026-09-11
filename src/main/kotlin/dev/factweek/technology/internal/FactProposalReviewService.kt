@@ -72,15 +72,6 @@ internal class FactProposalReviewService(
         return proposal
     }
 
-    private fun CandidateSourceType.toTechnologySourceType(): SourceType = when (this) {
-        CandidateSourceType.NEWS_REPORT -> SourceType.NEWS_REPORT
-        CandidateSourceType.PRIMARY_DOCUMENT -> SourceType.PRIMARY_DOCUMENT
-        CandidateSourceType.PAPER -> SourceType.PAPER
-        CandidateSourceType.DATASET -> SourceType.DATASET
-        CandidateSourceType.REPOSITORY -> SourceType.REPOSITORY
-        CandidateSourceType.REGULATOR -> SourceType.REGULATOR
-    }
-
     private companion object {
         const val MAX_REJECTION_REASON_LENGTH = 1000
     }
