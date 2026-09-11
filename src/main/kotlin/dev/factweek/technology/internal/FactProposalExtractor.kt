@@ -8,8 +8,16 @@ import java.util.UUID
 
 /** Provider-neutral application port for the future Spring AI adapter. */
 internal interface FactProposalExtractor {
+    /** Stable metadata needed to select and claim source documents before extraction starts. */
+    val metadata: FactProposalExtractionMetadata
+
     fun extract(request: FactProposalExtractionRequest): List<ExtractedFactProposal>
 }
+
+internal data class FactProposalExtractionMetadata(
+    val model: String,
+    val schemaVersion: String,
+)
 
 internal data class FactProposalExtractionRequest(
     val sourceDocumentId: UUID,
@@ -25,6 +33,4 @@ internal data class ExtractedFactProposal(
     val occurredOn: LocalDate?,
     val evidenceText: String,
     val evidenceLevel: EvidenceLevel,
-    val extractionModel: String,
-    val extractionSchemaVersion: String,
 )

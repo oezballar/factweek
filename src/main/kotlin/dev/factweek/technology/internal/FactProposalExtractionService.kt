@@ -7,12 +7,15 @@ import org.springframework.stereotype.Service
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.util.Locale
+import java.util.UUID
 
 @Service
 internal class FactProposalExtractionService(
     private val sourceDocuments: SourceDocuments,
     private val extractorProvider: ObjectProvider<FactProposalExtractor>,
     private val proposals: FactProposalRepository,
+    private val attempts: FactProposalExtractionAttemptRepository,
     private val clock: Clock,
     meterRegistry: MeterRegistry,
 ) {
@@ -24,13 +27,15 @@ internal class FactProposalExtractionService(
     fun extract(maximum: Int): FactProposalExtractionResult {
         if (maximum !in 1..25) throw InvalidFactProposalExtractionRequestException()
         val extractor = requireNotNull(extractorProvider.ifAvailable) { "No fact-proposal extractor is configured" }
-        val selected = sourceDocuments.findFetchedForFactProposals(maximum)
+        val metadata = extractor.metadata.validated()
+        val processedSourceDocumentIds = attempts.findProcessedSourceDocumentIds(metadata.schemaVersion).toSet()
+        val selected = sourceDocuments.findFetchedForFactProposals(maximum, processedSourceDocumentIds)
         var proposed = 0
         var rejected = 0
         var skipped = 0
 
         selected.forEach { sourceDocument ->
-            if (proposals.existsBySourceDocumentId(sourceDocument.id)) {
+            if (attempts.claim(UUID.randomUUID(), sourceDocument.id, metadata.model, metadata.schemaVersion, clock.instant()) == 0) {
                 skipped++
                 return@forEach
             }
@@ -42,29 +47,29 @@ internal class FactProposalExtractionService(
                     contentSha256 = sourceDocument.contentSha256,
                 ),
             )
-            val valid = extracted.filter(::isValid)
-                .distinctBy { proposal -> proposal.statement.trim() to proposal.extractionSchemaVersion.trim() }
-            if (valid.isEmpty()) {
-                rejected++
-                return@forEach
-            }
-            valid.forEach { proposal ->
+            val seenStatements = mutableSetOf<String>()
+            extracted.forEach { proposal ->
+                val normalizedStatement = normalizeWhitespace(proposal.statement)
+                if (!isValid(sourceDocument.textContent, proposal) || !seenStatements.add(normalizedStatement)) {
+                    rejected++
+                    return@forEach
+                }
                 proposals.save(
                     FactProposalEntity(
                         sourceDocumentId = sourceDocument.id,
-                        statement = proposal.statement.trim(),
+                        statement = normalizedStatement,
                         category = proposal.category,
                         occurredOn = proposal.occurredOn,
-                        evidenceText = proposal.evidenceText.trim(),
+                        evidenceText = normalizeWhitespace(proposal.evidenceText),
                         evidenceLevel = proposal.evidenceLevel,
-                        extractionModel = proposal.extractionModel.trim(),
-                        extractionSchemaVersion = proposal.extractionSchemaVersion.trim(),
+                        extractionModel = metadata.model,
+                        extractionSchemaVersion = metadata.schemaVersion,
                         createdAt = clock.instant(),
                         entities = proposal.entities.map { EntityValue(it.name.trim(), it.type) }.toMutableList(),
                     ),
                 )
+                proposed++
             }
-            proposed++
         }
 
         proposedCounter.increment(proposed.toDouble())
@@ -80,14 +85,29 @@ internal class FactProposalExtractionService(
         return result
     }
 
-    private fun isValid(proposal: ExtractedFactProposal): Boolean =
-        proposal.statement.isNotBlank() && proposal.statement.length <= 1000 &&
-            proposal.evidenceText.isNotBlank() && proposal.evidenceText.length <= 2000 &&
-            proposal.extractionModel.isNotBlank() && proposal.extractionModel.length <= 255 &&
-            proposal.extractionSchemaVersion.isNotBlank() && proposal.extractionSchemaVersion.length <= 128 &&
+    private fun isValid(sourceText: String, proposal: ExtractedFactProposal): Boolean {
+        val statement = normalizeWhitespace(proposal.statement)
+        val evidence = normalizeWhitespace(proposal.evidenceText)
+        return statement.isNotBlank() && statement.length <= 1000 &&
+            evidence.isNotBlank() && evidence.length <= 2000 &&
+            normalizeForComparison(sourceText).contains(normalizeForComparison(evidence)) &&
             proposal.entities.all { it.name.isNotBlank() && it.name.length <= 255 }
+    }
+
+    private fun FactProposalExtractionMetadata.validated(): FactProposalExtractionMetadata {
+        val normalizedModel = normalizeWhitespace(model)
+        val normalizedSchemaVersion = normalizeWhitespace(schemaVersion)
+        require(normalizedModel.isNotBlank() && normalizedModel.length <= 255) { "Invalid extraction model metadata" }
+        require(normalizedSchemaVersion.isNotBlank() && normalizedSchemaVersion.length <= 128) { "Invalid extraction schema metadata" }
+        return FactProposalExtractionMetadata(normalizedModel, normalizedSchemaVersion)
+    }
+
+    private fun normalizeWhitespace(value: String): String = value.trim().replace(WHITESPACE, " ")
+
+    private fun normalizeForComparison(value: String): String = normalizeWhitespace(value).lowercase(Locale.ROOT)
 
     private companion object {
+        val WHITESPACE = Regex("\\s+")
         val logger = LoggerFactory.getLogger(FactProposalExtractionService::class.java)
     }
 }

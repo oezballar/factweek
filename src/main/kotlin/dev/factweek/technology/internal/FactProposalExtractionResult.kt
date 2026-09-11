@@ -8,6 +8,10 @@ internal data class FactProposalExtractionResult(
     val skippedCount: Int,
 ) {
     init {
-        require(proposedCount + rejectedCount + skippedCount == selectedCount)
+        require(requestedMaximum in 1..25)
+        require(selectedCount >= 0)
+        require(proposedCount >= 0)
+        require(rejectedCount >= 0)
+        require(skippedCount in 0..selectedCount)
     }
 }

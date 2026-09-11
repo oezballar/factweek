@@ -37,6 +37,10 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @SpringBootTest(
     classes = [FactProposalExtractionServiceTest.TestApplication::class],
@@ -51,16 +55,19 @@ class FactProposalExtractionServiceTest {
     @Autowired private lateinit var candidates: NewsCandidateRepository
     @Autowired private lateinit var documents: SourceDocumentRepository
     @Autowired private lateinit var proposals: FactProposalRepository
+    @Autowired private lateinit var attempts: FactProposalExtractionAttemptRepository
     @Autowired private lateinit var extractor: StubExtractor
 
     @BeforeEach
     fun clean() {
+        attempts.deleteAllAttempts()
         proposals.deleteAll()
         documents.deleteAll()
         candidates.deleteAll()
         extractor.response = listOf(validProposal())
+        extractor.metadataValue = FactProposalExtractionMetadata("stub-model", "v1")
         extractor.failure = null
-        extractor.calls = 0
+        extractor.calls.set(0)
     }
 
     @Test
@@ -74,10 +81,10 @@ class FactProposalExtractionServiceTest {
         assertEquals(1, first.proposedCount)
         assertEquals(FactProposalStatus.PROPOSED, proposals.findAll().single().status)
         assertEquals(candidate.id, proposals.findAll().single().sourceDocumentId)
-        assertEquals(1, second.selectedCount)
-        assertEquals(1, second.skippedCount)
+        assertEquals(0, second.selectedCount)
+        assertEquals(0, second.skippedCount)
         assertEquals(1, proposals.count())
-        assertEquals(1, extractor.calls)
+        assertEquals(1, extractor.calls.get())
     }
 
     @Test
@@ -89,6 +96,24 @@ class FactProposalExtractionServiceTest {
 
         assertEquals(1, result.rejectedCount)
         assertEquals(0, proposals.count())
+
+        extraction.extract(10)
+        assertEquals(1, extractor.calls.get())
+    }
+
+    @Test
+    fun `empty extraction results are recorded and not retried for the same schema`() {
+        fetchedCandidate("empty")
+        extractor.response = emptyList()
+
+        val first = extraction.extract(10)
+        val second = extraction.extract(10)
+
+        assertEquals(1, first.selectedCount)
+        assertEquals(0, first.proposedCount)
+        assertEquals(0, first.rejectedCount)
+        assertEquals(0, second.selectedCount)
+        assertEquals(1, extractor.calls.get())
     }
 
     @Test
@@ -99,7 +124,7 @@ class FactProposalExtractionServiceTest {
         val result = extraction.extract(10)
 
         assertEquals(0, result.selectedCount)
-        assertEquals(0, extractor.calls)
+        assertEquals(0, extractor.calls.get())
     }
 
     @Test
@@ -112,6 +137,92 @@ class FactProposalExtractionServiceTest {
         assertEquals(0, proposals.count())
     }
 
+    @Test
+    fun `processed documents beyond maximum do not block a new document`() {
+        repeat(30) { fetchedCandidate("old-$it") }
+        extraction.extract(25)
+        extraction.extract(25)
+        val newest = fetchedCandidate("new")
+
+        val result = extraction.extract(1)
+
+        assertEquals(1, result.selectedCount)
+        assertEquals(1, result.proposedCount)
+        assertEquals(newest.id, proposals.findAll().single { it.sourceDocumentId == newest.id }.sourceDocumentId)
+    }
+
+    @Test
+    fun `a new schema version can process the same source document again`() {
+        fetchedCandidate("schema")
+        extraction.extract(10)
+        extractor.metadataValue = FactProposalExtractionMetadata("stub-model", "v2")
+
+        val result = extraction.extract(10)
+
+        assertEquals(1, result.selectedCount)
+        assertEquals(1, result.proposedCount)
+        assertEquals(2, proposals.count())
+    }
+
+    @Test
+    fun `counts each valid and invalid proposal independently`() {
+        fetchedCandidate("mixed")
+        extractor.response = listOf(
+            validProposal(statement = "One valid claim."),
+            validProposal(statement = "Paraphrased claim.", evidence = "Not in the source."),
+            validProposal(statement = "Two valid claim."),
+            validProposal(statement = "Three valid claim."),
+        )
+
+        val result = extraction.extract(10)
+
+        assertEquals(3, result.proposedCount)
+        assertEquals(1, result.rejectedCount)
+        assertEquals(3, proposals.count())
+    }
+
+    @Test
+    fun `stores valid proposals while rejecting invalid proposals from the same document`() {
+        fetchedCandidate("one-valid-one-invalid")
+        extractor.response = listOf(
+            validProposal(statement = "A supported claim."),
+            validProposal(statement = "An unsupported claim.", evidence = "Paraphrased evidence."),
+        )
+
+        val result = extraction.extract(10)
+
+        assertEquals(1, result.proposedCount)
+        assertEquals(1, result.rejectedCount)
+        assertEquals(1, proposals.count())
+    }
+
+    @Test
+    fun `rejects evidence that is not a source excerpt`() {
+        fetchedCandidate("invented-evidence")
+        extractor.response = listOf(validProposal(evidence = "This is an invented paraphrase."))
+
+        val result = extraction.extract(10)
+
+        assertEquals(0, result.proposedCount)
+        assertEquals(1, result.rejectedCount)
+        assertEquals(0, proposals.count())
+    }
+
+    @Test
+    fun `concurrent extraction claims a source document only once`() {
+        fetchedCandidate("concurrent")
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val futures = executor.invokeAll(List(2) { Callable { extraction.extract(10) } })
+            futures.forEach { it.get(30, TimeUnit.SECONDS) }
+        } finally {
+            executor.shutdownNow()
+        }
+
+        assertEquals(1, proposals.count())
+        assertEquals(1, extractor.calls.get())
+    }
+
     private fun fetchedCandidate(path: String) = candidatePersistence.storeDiscovered(candidate(path)).also { candidate ->
         sourcePersistence.recordSuccess(
             candidate,
@@ -119,7 +230,7 @@ class FactProposalExtractionServiceTest {
                 URI.create(candidate.canonicalUrl),
                 "text/html",
                 200,
-                "Stored source content for $path with sufficient text.",
+                "The source explicitly reports a measurable technology result. Additional stored source content for $path.",
                 "a".repeat(64),
             ),
         )
@@ -133,15 +244,16 @@ class FactProposalExtractionServiceTest {
         discoveredAt = Instant.parse("2026-09-01T00:00:00Z"),
     )
 
-    private fun validProposal(statement: String = "A laboratory demonstrated a measurable technology result.") = ExtractedFactProposal(
+    private fun validProposal(
+        statement: String = "A laboratory demonstrated a measurable technology result.",
+        evidence: String = "The source explicitly reports a measurable technology result.",
+    ) = ExtractedFactProposal(
         statement = statement,
         category = TechnologyCategory.ENERGY_AND_CLIMATE,
         entities = listOf(EntityReference("Example battery", EntityType.TECHNOLOGY)),
         occurredOn = LocalDate.of(2026, 9, 1),
-        evidenceText = "The source explicitly reports a measurable technology result.",
+        evidenceText = evidence,
         evidenceLevel = EvidenceLevel.DOCUMENTED,
-        extractionModel = "stub-model",
-        extractionSchemaVersion = "v1",
     )
 
     @SpringBootConfiguration
@@ -165,12 +277,16 @@ class FactProposalExtractionServiceTest {
     }
 
     internal class StubExtractor : FactProposalExtractor {
+        override var metadata: FactProposalExtractionMetadata
+            get() = metadataValue
+            set(value) { metadataValue = value }
+        var metadataValue = FactProposalExtractionMetadata("stub-model", "v1")
         var response: List<ExtractedFactProposal> = emptyList()
         var failure: RuntimeException? = null
-        var calls: Int = 0
+        val calls = AtomicInteger()
 
         override fun extract(request: FactProposalExtractionRequest): List<ExtractedFactProposal> {
-            calls++
+            calls.incrementAndGet()
             failure?.let { throw it }
             return response
         }

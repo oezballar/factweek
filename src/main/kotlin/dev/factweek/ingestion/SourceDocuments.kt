@@ -5,7 +5,14 @@ import java.util.UUID
 
 /** Public read API for successfully retrieved source content. */
 interface SourceDocuments {
-    fun findFetchedForFactProposals(maximum: Int): List<FetchedSourceDocument>
+    /**
+     * Returns at most [maximum] fetched documents whose ids are not in [excludedSourceDocumentIds].
+     * Exclusion is applied by the database before the limit.
+     */
+    fun findFetchedForFactProposals(
+        maximum: Int,
+        excludedSourceDocumentIds: Set<UUID>,
+    ): List<FetchedSourceDocument>
 }
 
 data class FetchedSourceDocument(
