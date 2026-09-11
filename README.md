@@ -10,6 +10,7 @@ The repository is deliberately built as a Spring Modulith modular monolith: one 
 - Kotlin 2.4.20
 - Spring Boot 4.1.1
 - Spring Modulith 2.1.1
+- Spring AI 2.0.1 (OpenAI adapter, opt-in)
 - PostgreSQL 18 with pgvector
 - Flyway and Testcontainers
 - Gradle Kotlin DSL
@@ -70,7 +71,27 @@ curl -X POST 'http://localhost:8080/api/v1/ingestion/source-content/fetches?maxi
 
 Stored source content is input material for later evaluation and extraction; it is not a verified fact. Source URLs are checked before every request, including redirects. DNS resolution checks cannot prevent every possible DNS-rebinding scenario; a future public or multi-tenant deployment should evaluate controlled egress.
 
-Fact-proposal persistence and its provider-neutral extraction port are available for controlled manual processing. A `FactProposal` is an unconfirmed model suggestion, not a `TechnologyFact`; it has a separate lifecycle and is never published automatically.
+Fact-proposal persistence and the Spring-AI OpenAI adapter are available for controlled manual processing. A `FactProposal` is an unconfirmed model suggestion, not a `TechnologyFact`; it has a separate lifecycle and is never published automatically.
+
+The OpenAI adapter is disabled by default. To enable it locally, provide a key only through the environment and enable both the application adapter and Spring AI's OpenAI model:
+
+```bash
+export OPENAI_API_KEY='replace-with-your-key'
+export FACTWEEK_OPENAI_ENABLED=true
+export SPRING_AI_MODEL_CHAT=openai
+export OPENAI_MODEL=gpt-5-mini # optional
+./gradlew bootRun
+```
+
+Then trigger at most one selected source document:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/extractions?maximum=1'
+```
+
+Each selected source document causes a billable OpenAI API request. `OPENAI_MODEL`, `OPENAI_PROMPT_VERSION`, `OPENAI_MAX_PROPOSALS_PER_DOCUMENT` (maximum 5), and `OPENAI_MAX_OUTPUT_TOKENS` are optional tuning variables. Do not put a key in configuration files. Disable the adapter by leaving `FACTWEEK_OPENAI_ENABLED` unset or `false` and `SPRING_AI_MODEL_CHAT=none`.
+
+`FACTWEEK_OPENAI_SMOKE_TEST=true ./gradlew test --tests dev.factweek.technology.internal.OpenAiFactProposalSmokeTest` runs an explicitly opt-in, billable smoke test; it is skipped by default. Ollama remains a future interchangeable adapter behind the same application port.
 
 Read the current reviewed briefing:
 
@@ -116,10 +137,10 @@ curl 'http://localhost:8080/api/v1/briefings/technology/current?categories=AI_AN
 ## Planned tooling
 
 - Spring Scheduling is the intended later solution for configurable scheduled GDELT imports; the manual import endpoint remains available.
-- Spring AI is planned for structured fact-proposal extraction behind an application-owned port.
+- Spring AI provides structured fact-proposal extraction behind an application-owned port; other providers such as Ollama can later implement the same port.
 - Embabel is only an optional future evaluation for demonstrated multi-step or agentic needs.
 - n8n and Flowise are not part of the planned architecture.
 
 ## Next slice
 
-Implement the productive Spring AI adapter behind the fact-proposal extraction port. Resulting proposals remain subject to deterministic validation and human review before any TechnologyFact can be published.
+Implement human review for deterministically validated FactProposals. Resulting proposals remain subject to review before any TechnologyFact can be published.

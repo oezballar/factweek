@@ -11,6 +11,17 @@ spring:
       ddl-auto: validate
   jackson:
     default-property-inclusion: non_null
+  ai:
+    model:
+      chat: ${SPRING_AI_MODEL_CHAT:none}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-5-mini}
+          max-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:1200}
+    retry:
+      max-attempts: 2
 
 factweek:
   gdelt:
@@ -26,6 +37,12 @@ factweek:
     user-agent: ${SOURCE_CONTENT_USER_AGENT:Factweek/0.1 (+https://github.com/oezballar/factweek)}
   fact-proposals:
     claim-lease: ${FACT_PROPOSAL_CLAIM_LEASE:15m}
+    openai:
+      enabled: ${FACTWEEK_OPENAI_ENABLED:false}
+      model: ${OPENAI_MODEL:gpt-5-mini}
+      prompt-version: ${OPENAI_PROMPT_VERSION:technology-fact-extraction-v1}
+      maximum-proposals-per-document: ${OPENAI_MAX_PROPOSALS_PER_DOCUMENT:5}
+      maximum-output-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:1200}
 
 management:
   endpoints:

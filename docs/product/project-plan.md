@@ -26,7 +26,7 @@ Deliver a personalized weekly briefing of relevant, evidenced technology changes
 - Direct publication of candidates or LLM output.
 - Scheduler implementation before manual imports are stable.
 - Agentic workflow infrastructure, n8n, and Flowise.
-- Spring AI, Embabel, or scheduling dependencies before their respective implementation phases.
+- Embabel or scheduling dependencies before their respective implementation phases.
 
 ## Architecture modules
 
@@ -47,7 +47,8 @@ Deliver a personalized weekly briefing of relevant, evidenced technology changes
 - Manual GDELT import: complete.
 - Source-content retrieval: complete.
 - Fact-proposal persistence and provider-neutral extraction port: complete.
-- Productive Spring AI extraction adapter: next milestone.
+- Productive Spring AI extraction adapter: complete (OpenAI, opt-in).
+- Ollama adapter: future interchangeable alternative.
 - Human review workflow: planned.
 - Weekly briefing from reviewed facts: basic structure exists; the complete vertical slice is planned.
 - Golden Dataset and evaluation: planned.
@@ -79,9 +80,9 @@ Deliver a personalized weekly briefing of relevant, evidenced technology changes
 - Scheduling and AI/workflow tooling: [ADR 0002](../architecture/adr-0002-scheduling-and-ai-tooling.md).
 - PostgreSQL, Flyway, and Testcontainers provide the persistence baseline.
 - Spring Scheduling is the intended future scheduling mechanism.
-- Spring AI is the intended structured-extraction integration behind an application-owned port.
+- Spring AI provides the first structured-extraction adapter behind an application-owned port; Ollama remains a future alternative behind that port.
 - Embabel is an optional future evaluation, not a committed component.
 
 ## Next milestone
 
-Implement the productive Spring AI adapter behind the completed fact-proposal extraction port. Stored source content and FactProposals are not verified facts; a FactProposal remains in a separate lifecycle and requires validation and human review before a TechnologyFact can be published.
+Implement the human review workflow for validated FactProposals. Stored source content and FactProposals are not verified facts; a FactProposal remains in a separate lifecycle and requires human review before a TechnologyFact can be published.
