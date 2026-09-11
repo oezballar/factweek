@@ -24,4 +24,6 @@ data class FetchedSourceDocument(
     val textContent: String,
     val contentSha256: String,
     val fetchedAt: Instant,
+    val publisher: String,
+    val sourceType: CandidateSourceType,
 )

@@ -4,6 +4,7 @@ import dev.factweek.ingestion.CandidateCaptureCommand
 import dev.factweek.ingestion.CandidateCaptureResult
 import dev.factweek.ingestion.CandidateCaptures
 import dev.factweek.ingestion.CandidateDiscoveryProvider
+import dev.factweek.ingestion.CandidateSourceType
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
@@ -51,6 +52,7 @@ internal data class ManualCandidateCaptureRequest(
     @field:NotBlank val publisher: String?,
     @field:NotNull val publishedAt: Instant?,
     @field:NotBlank val language: String?,
+    @field:NotNull val sourceType: CandidateSourceType?,
 ) {
     fun toCommand(): CandidateCaptureCommand = CandidateCaptureCommand(
         sourceUrl = try {
@@ -63,5 +65,6 @@ internal data class ManualCandidateCaptureRequest(
         publishedAt = publishedAt,
         language = language,
         discoveryProvider = CandidateDiscoveryProvider.MANUAL,
+        sourceType = sourceType ?: throw InvalidCandidateCaptureException(),
     )
 }

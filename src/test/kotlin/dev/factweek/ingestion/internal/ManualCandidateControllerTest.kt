@@ -23,7 +23,7 @@ class ManualCandidateControllerTest {
     @BeforeEach fun setUp() {
         captures = object : CandidateCaptures {
             override fun capture(command: dev.factweek.ingestion.CandidateCaptureCommand) =
-                CandidateCaptureResult(UUID.fromString("00000000-0000-0000-0000-000000000001"), command.sourceUrl, command.title, command.publisher, command.publishedAt, command.language, command.discoveryProvider, true)
+                CandidateCaptureResult(UUID.fromString("00000000-0000-0000-0000-000000000001"), command.sourceUrl, command.title, command.publisher, command.publishedAt, command.language, command.discoveryProvider, command.sourceType, true)
         }
         mockMvc = MockMvcBuilders.standaloneSetup(ManualCandidateController(captures)).build()
     }
@@ -33,6 +33,7 @@ class ManualCandidateControllerTest {
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.created").value(true))
             .andExpect(jsonPath("$.discoveryProvider").value("MANUAL"))
+            .andExpect(jsonPath("$.sourceType").value("PRIMARY_DOCUMENT"))
     }
 
     @Test fun `rejects missing malformed and invalid bodies as problem details`() {
@@ -43,5 +44,5 @@ class ManualCandidateControllerTest {
         }
     }
 
-    private fun body() = """{"sourceUrl":"https://example.org/result","title":"New battery result","publisher":"Example","publishedAt":"2026-09-11T08:00:00Z","language":"en"}"""
+    private fun body() = """{"sourceUrl":"https://example.org/result","title":"New battery result","publisher":"Example","publishedAt":"2026-09-11T08:00:00Z","language":"en","sourceType":"PRIMARY_DOCUMENT"}"""
 }

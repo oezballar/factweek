@@ -81,7 +81,7 @@ class FactProposalReviewServiceTest {
         assertEquals(proposal.statement, fact.statement)
         assertEquals(proposal.entities.toList(), fact.entities.toList())
         assertEquals("https://example.org/review", fact.sources.single().url)
-        assertEquals("example.org", fact.sources.single().publisher)
+        assertEquals("Example", fact.sources.single().publisher)
     }
 
     @Test

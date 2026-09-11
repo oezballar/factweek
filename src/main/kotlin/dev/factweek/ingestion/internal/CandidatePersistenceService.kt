@@ -37,6 +37,7 @@ internal class CandidatePersistenceService(
             publishedAt = normalized.publishedAt,
             language = normalized.language,
             discoveryProvider = normalized.discoveryProvider,
+            sourceType = normalized.sourceType,
             fetchedAt = clock.instant(),
             status = CandidateStatus.DISCOVERED,
         )
@@ -74,6 +75,7 @@ internal class CandidatePersistenceService(
             publishedAt = command.publishedAt,
             language = language,
             discoveryProvider = command.discoveryProvider,
+            sourceType = command.sourceType,
         )
     }
 
@@ -86,7 +88,7 @@ internal class CandidatePersistenceService(
 
     private fun NewsCandidateEntity.matches(incoming: NormalizedCandidateCapture): Boolean =
         title == incoming.title && publisher == incoming.publisher &&
-            publishedAt == incoming.publishedAt && language == incoming.language
+            publishedAt == incoming.publishedAt && language == incoming.language && sourceType == incoming.sourceType
 
     private fun toResult(candidate: NewsCandidateEntity, created: Boolean) = CandidateCaptureResult(
         candidateId = candidate.id,
@@ -96,6 +98,7 @@ internal class CandidatePersistenceService(
         publishedAt = candidate.publishedAt,
         language = candidate.language,
         discoveryProvider = candidate.discoveryProvider,
+        sourceType = candidate.sourceType,
         created = created,
     )
 
@@ -107,6 +110,7 @@ internal class CandidatePersistenceService(
         val publishedAt: java.time.Instant?,
         val language: String?,
         val discoveryProvider: CandidateDiscoveryProvider,
+        val sourceType: dev.factweek.ingestion.CandidateSourceType,
     )
 
     private companion object {
