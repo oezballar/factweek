@@ -75,6 +75,24 @@ Stored source content is input material for later evaluation and extraction; it 
 
 Fact-proposal persistence and the Spring-AI OpenAI adapter are available for controlled manual processing. A `FactProposal` is an unconfirmed model suggestion, not a `TechnologyFact`; it has a separate lifecycle and is never published automatically.
 
+Fact Proposals require an explicit human decision. Their only state transitions are `PROPOSED -> ACCEPTED` and `PROPOSED -> REJECTED`; both decision states are terminal. Accepting creates one traceable TechnologyFact in the same transaction, while rejecting requires a documented reason and creates no fact. The proposal retains the original statement and evidence; its link to the resulting TechnologyFact preserves the review provenance.
+
+Accept a proposal with the reviewer-supplied event classification and readiness. `occurredOn` is required only when the proposal did not already contain a date:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/PROPOSAL_ID/accept' \
+  -H 'Content-Type: application/json' \
+  -d '{"eventType":"TECHNOLOGY_DEPLOYED","readiness":"PRODUCTION_USE"}'
+```
+
+Reject a proposal with a non-empty reason:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/PROPOSAL_ID/reject' \
+  -H 'Content-Type: application/json' \
+  -d '{"reason":"Insufficient independent corroboration."}'
+```
+
 The OpenAI adapter is disabled by default. To enable it locally, provide a key only through the environment and enable both the application adapter and Spring AI's OpenAI model:
 
 ```bash
