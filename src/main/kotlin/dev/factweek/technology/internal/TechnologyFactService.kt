@@ -28,8 +28,8 @@ internal class TechnologyFactService(
     }
 
     @Transactional(readOnly = true)
-    override fun publishedBetween(from: LocalDate, to: LocalDate): List<TechnologyFact> =
-        repository.findAllByOccurredOnBetweenOrderByOccurredOnDesc(from, to).map { it.toDomain() }
+    override fun occurredBetween(from: LocalDate, to: LocalDate): List<TechnologyFact> =
+        repository.findAllByOccurredOnBetweenOrderByOccurredOnDescIdAsc(from, to).map { it.toDomain() }
 }
 
 internal object TechnologyFactPolicy {

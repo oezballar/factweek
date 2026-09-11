@@ -119,10 +119,47 @@ The OpenAI adapter uses a dedicated Strict Structured Outputs schema rather than
 
 `FACTWEEK_OPENAI_SMOKE_TEST=true ./gradlew test --tests dev.factweek.technology.internal.OpenAiFactProposalSmokeTest` runs an explicitly opt-in, billable smoke test; it is skipped by default. Ollama remains a future interchangeable adapter behind the same application port.
 
-Read the current reviewed briefing:
+Read the current factual technology briefing:
 
 ```bash
 curl 'http://localhost:8080/api/v1/briefings/technology/current'
+```
+
+`current` is a rolling seven-calendar-day window, not an ISO calendar week: it includes today and the preceding six calendar days. For example, a Sunday request covers Monday through Sunday. The endpoint returns facts and transparent selection metadata only; it does not generate narrative text. `maximum` defaults to `10` and accepts values from `1` through `50`.
+
+Request a smaller result set without category filtering:
+
+```bash
+curl 'http://localhost:8080/api/v1/briefings/technology/current?maximum=5'
+```
+
+Filter by one or more categories by repeating the `categories` parameter:
+
+```bash
+curl 'http://localhost:8080/api/v1/briefings/technology/current?categories=AI_AND_SOFTWARE&categories=ENERGY_AND_CLIMATE&maximum=10'
+```
+
+The response is a fact structure with the applied range, filters, and limit:
+
+```json
+{
+  "from": "2026-09-07",
+  "to": "2026-09-13",
+  "generatedAt": "2026-09-13T12:00:00Z",
+  "appliedCategories": ["AI_AND_SOFTWARE", "ENERGY_AND_CLIMATE"],
+  "requestedMaximum": 10,
+  "factCount": 1,
+  "facts": [{
+    "statement": "A concrete technology fact.",
+    "category": "AI_AND_SOFTWARE",
+    "eventType": "TECHNOLOGY_DEPLOYED",
+    "readiness": "PRODUCTION_USE",
+    "evidenceLevel": "PRIMARY_CONFIRMED",
+    "occurredOn": "2026-09-11",
+    "entities": [{"name": "Example technology", "type": "TECHNOLOGY"}],
+    "sources": [{"url": "https://example.org/source", "publisher": "Example", "sourceType": "NEWS_REPORT"}]
+  }]
+}
 ```
 
 Manually publish a reviewed fact for the first end-to-end slice:
@@ -144,12 +181,6 @@ curl -X POST 'http://localhost:8080/api/v1/technology/facts' \
       "sourceType": "PAPER"
     }]
   }'
-```
-
-Filtering is explicit:
-
-```bash
-curl 'http://localhost:8080/api/v1/briefings/technology/current?categories=AI_AND_SOFTWARE'
 ```
 
 ## Architectural rules
