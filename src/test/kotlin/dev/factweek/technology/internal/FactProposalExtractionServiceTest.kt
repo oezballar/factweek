@@ -143,6 +143,17 @@ class FactProposalExtractionServiceTest {
     }
 
     @Test
+    fun `marks controlled OpenAI adapter failures as failed attempts`() {
+        fetchedCandidate("openai-output-limit")
+        extractor.failure = OpenAiFactProposalAdapterException("OpenAI returned more proposals than requested")
+
+        assertThrows<OpenAiFactProposalAdapterException> { extraction.extract(10) }
+
+        assertEquals(FactProposalExtractionAttemptStatus.FAILED, attempts.findAll().single().status)
+        assertEquals(0, proposals.count())
+    }
+
+    @Test
     fun `failed extraction attempts are retried immediately`() {
         fetchedCandidate("retry")
         extractor.failure = IllegalStateException("temporary extractor failure")

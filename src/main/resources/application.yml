@@ -19,7 +19,6 @@ spring:
       chat:
         options:
           model: ${OPENAI_MODEL:gpt-5-mini}
-          max-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:1200}
     retry:
       max-attempts: 2
 

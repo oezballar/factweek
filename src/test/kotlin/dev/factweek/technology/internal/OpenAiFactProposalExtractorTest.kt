@@ -2,6 +2,7 @@ package dev.factweek.technology.internal
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.support.TransactionSynchronizationManager
@@ -46,6 +47,28 @@ class OpenAiFactProposalExtractorTest {
         client.response = OpenAiFactProposalResponse(listOf(OpenAiFactProposalDto(statement = "A claim")))
 
         assertThrows<OpenAiFactProposalAdapterException> { extractor.extract(request()) }
+    }
+
+    @Test
+    fun `rejects responses that exceed the configured proposal limit`() {
+        client.response = OpenAiFactProposalResponse(List(6) { response().proposals!!.single() })
+
+        assertThrows<OpenAiFactProposalAdapterException> { extractor.extract(request()) }
+    }
+
+    @Test
+    fun `uses only GPT-5 compatible request token options`() {
+        val prompt = OpenAiFactProposalPrompt.create(
+            request(),
+            OpenAiFactProposalSettings("test-key", "gpt-5-mini", "v1", 5, 1200),
+        )
+
+        val options = OpenAiRequestOptions.forPrompt(prompt).build()
+
+        assertEquals("gpt-5-mini", options.model)
+        assertEquals(1200, options.maxCompletionTokens)
+        assertNull(options.maxTokens)
+        assertNull(options.temperature)
     }
 
     @Test

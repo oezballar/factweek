@@ -20,13 +20,16 @@ internal class SpringAiOpenAiFactProposalClient(
         chatClient.prompt()
             .system(prompt.systemInstruction)
             .user(prompt.userContent)
-            .options(
-                OpenAiChatOptions.builder()
-                    .model(prompt.model)
-                    .maxCompletionTokens(prompt.maximumOutputTokens),
-            )
+            .options(OpenAiRequestOptions.forPrompt(prompt))
             .call()
             .entity(OpenAiFactProposalResponse::class.java) { specification ->
                 specification.useProviderStructuredOutput()
             }
+}
+
+internal object OpenAiRequestOptions {
+    fun forPrompt(prompt: OpenAiFactProposalPrompt): OpenAiChatOptions.Builder =
+        OpenAiChatOptions.builder()
+            .model(prompt.model)
+            .maxCompletionTokens(prompt.maximumOutputTokens)
 }

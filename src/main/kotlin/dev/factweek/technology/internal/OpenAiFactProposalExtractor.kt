@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import java.time.LocalDate
+import java.util.Locale
 
 /** OpenAI-specific adapter. The application port remains provider independent. */
 @Component
@@ -25,6 +26,9 @@ internal class OpenAiFactProposalExtractor(
             ?: throw OpenAiFactProposalAdapterException("OpenAI returned an empty structured response")
         val proposals = response.proposals
             ?: throw OpenAiFactProposalAdapterException("OpenAI structured response omitted proposals")
+        if (proposals.size > settings.maximumProposals) {
+            throw OpenAiFactProposalAdapterException("OpenAI returned more proposals than requested")
+        }
         val mapped = proposals.map(::mapProposal)
         logger.atInfo()
             .addKeyValue("sourceDocumentId", request.sourceDocumentId)
@@ -58,7 +62,7 @@ internal class OpenAiFactProposalExtractor(
         this?.takeIf { it.isNotBlank() } ?: throw OpenAiFactProposalAdapterException("OpenAI structured response omitted $field")
 
     private inline fun <reified T : Enum<T>> String?.toEnum(field: String): T = try {
-        enumValueOf<T>(this?.trim()?.uppercase() ?: throw OpenAiFactProposalAdapterException("OpenAI structured response omitted $field"))
+        enumValueOf<T>(this?.trim()?.uppercase(Locale.ROOT) ?: throw OpenAiFactProposalAdapterException("OpenAI structured response omitted $field"))
     } catch (_: IllegalArgumentException) {
         throw OpenAiFactProposalAdapterException("OpenAI returned an unsupported $field")
     }
