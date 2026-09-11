@@ -16,6 +16,7 @@ data class CandidateCaptureCommand(
     val publishedAt: Instant?,
     val language: String?,
     val discoveryProvider: CandidateDiscoveryProvider,
+    val sourceType: CandidateSourceType = CandidateSourceType.NEWS_REPORT,
 )
 
 data class CandidateCaptureResult(
@@ -26,6 +27,7 @@ data class CandidateCaptureResult(
     val publishedAt: Instant?,
     val language: String?,
     val discoveryProvider: CandidateDiscoveryProvider,
+    val sourceType: CandidateSourceType = CandidateSourceType.NEWS_REPORT,
     val created: Boolean,
 )
 
@@ -33,3 +35,5 @@ enum class CandidateDiscoveryProvider {
     GDELT,
     MANUAL,
 }
+
+enum class CandidateSourceType { NEWS_REPORT, PRIMARY_DOCUMENT, PAPER, DATASET, REPOSITORY, REGULATOR }

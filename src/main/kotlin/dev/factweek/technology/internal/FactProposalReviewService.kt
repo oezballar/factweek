@@ -1,6 +1,7 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.ingestion.SourceDocuments
+import dev.factweek.ingestion.CandidateSourceType
 import dev.factweek.technology.SourceType
 import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyReadiness
@@ -37,8 +38,8 @@ internal class FactProposalReviewService(
                 sources = mutableListOf(
                     SourceValue(
                         sourceDocument.sourceUrl,
-                        sourcePublisher(sourceDocument.sourceUrl),
-                        SourceType.NEWS_REPORT,
+                        sourceDocument.publisher,
+                        sourceDocument.sourceType.toTechnologySourceType(),
                     ),
                 ),
             ),
@@ -71,9 +72,14 @@ internal class FactProposalReviewService(
         return proposal
     }
 
-    private fun sourcePublisher(sourceUrl: String): String =
-        URI.create(sourceUrl).host?.takeIf { it.isNotBlank() }
-            ?: throw FactProposalReviewConflictException()
+    private fun CandidateSourceType.toTechnologySourceType(): SourceType = when (this) {
+        CandidateSourceType.NEWS_REPORT -> SourceType.NEWS_REPORT
+        CandidateSourceType.PRIMARY_DOCUMENT -> SourceType.PRIMARY_DOCUMENT
+        CandidateSourceType.PAPER -> SourceType.PAPER
+        CandidateSourceType.DATASET -> SourceType.DATASET
+        CandidateSourceType.REPOSITORY -> SourceType.REPOSITORY
+        CandidateSourceType.REGULATOR -> SourceType.REGULATOR
+    }
 
     private companion object {
         const val MAX_REJECTION_REASON_LENGTH = 1000

@@ -5,6 +5,7 @@ import dev.factweek.ingestion.GdeltImportResult
 import dev.factweek.ingestion.CandidateCaptureCommand
 import dev.factweek.ingestion.CandidateCaptures
 import dev.factweek.ingestion.CandidateDiscoveryProvider
+import dev.factweek.ingestion.CandidateSourceType
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -71,6 +72,7 @@ internal class GdeltImportService(
             publishedAt = discoveredAt,
             language = language,
             discoveryProvider = CandidateDiscoveryProvider.GDELT,
+            sourceType = CandidateSourceType.NEWS_REPORT,
         )
     }
 }

@@ -36,5 +36,7 @@ internal class SourceDocumentQueryService(
         textContent = requireNotNull(document.textContent),
         contentSha256 = requireNotNull(document.contentSha256),
         fetchedAt = requireNotNull(document.fetchedAt),
+        publisher = document.candidate.publisher,
+        sourceType = document.candidate.sourceType,
     )
 }
