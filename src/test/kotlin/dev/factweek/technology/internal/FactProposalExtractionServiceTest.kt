@@ -1,6 +1,7 @@
 package dev.factweek.technology.internal
 
-import dev.factweek.ingestion.GdeltCandidate
+import dev.factweek.ingestion.CandidateCaptureCommand
+import dev.factweek.ingestion.CandidateDiscoveryProvider
 import dev.factweek.ingestion.internal.CandidatePersistenceService
 import dev.factweek.ingestion.internal.CandidateWriter
 import dev.factweek.ingestion.internal.NewsCandidateRepository
@@ -315,12 +316,13 @@ class FactProposalExtractionServiceTest {
         )
     }
 
-    private fun candidate(path: String) = GdeltCandidate(
+    private fun candidate(path: String) = CandidateCaptureCommand(
         title = "Candidate $path",
-        url = URI.create("https://example.org/$path"),
-        sourceCountry = "DE",
+        sourceUrl = URI.create("https://example.org/$path"),
+        publisher = "Example",
         language = "de",
-        discoveredAt = Instant.parse("2026-09-01T00:00:00Z"),
+        publishedAt = Instant.parse("2026-09-01T00:00:00Z"),
+        discoveryProvider = CandidateDiscoveryProvider.GDELT,
     )
 
     private fun validProposal(
@@ -343,6 +345,7 @@ class FactProposalExtractionServiceTest {
     @Import(
         CandidatePersistenceService::class,
         CandidateWriter::class,
+        dev.factweek.ingestion.internal.CandidateUrlNormalizer::class,
         SourceDocumentPersistenceService::class,
         SourceDocumentQueryService::class,
         FactProposalExtractionAttemptService::class,

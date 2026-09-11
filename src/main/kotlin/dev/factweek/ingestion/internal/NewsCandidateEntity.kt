@@ -1,5 +1,6 @@
 package dev.factweek.ingestion.internal
 
+import dev.factweek.ingestion.CandidateDiscoveryProvider
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -23,10 +24,17 @@ internal class NewsCandidateEntity(
     val canonicalUrl: String,
     @Column(nullable = false, length = 1000)
     val title: String,
+    @Column(nullable = false, length = 255)
+    val publisher: String,
     @Column(name = "source_domain", nullable = false, length = 255)
     val sourceDomain: String,
     @Column(name = "published_at")
     val publishedAt: Instant?,
+    @Column(length = 32)
+    val language: String?,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discovery_provider", nullable = false, length = 32)
+    val discoveryProvider: CandidateDiscoveryProvider,
     @Column(name = "fetched_at", nullable = false)
     val fetchedAt: Instant,
     @Enumerated(EnumType.STRING)

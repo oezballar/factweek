@@ -1,6 +1,7 @@
 package dev.factweek.technology.internal
 
-import dev.factweek.ingestion.GdeltCandidate
+import dev.factweek.ingestion.CandidateCaptureCommand
+import dev.factweek.ingestion.CandidateDiscoveryProvider
 import dev.factweek.ingestion.internal.CandidatePersistenceService
 import dev.factweek.ingestion.internal.CandidateWriter
 import dev.factweek.ingestion.internal.NewsCandidateRepository
@@ -161,12 +162,13 @@ class FactProposalReviewServiceTest {
 
     private fun proposed(path: String = "review"): FactProposalEntity {
         val candidate = candidatePersistence.storeDiscovered(
-            GdeltCandidate(
+            CandidateCaptureCommand(
                 title = "Review candidate $path",
-                url = URI.create("https://example.org/$path"),
-                sourceCountry = "DE",
+                sourceUrl = URI.create("https://example.org/$path"),
+                publisher = "Example",
                 language = "en",
-                discoveredAt = Instant.parse("2026-09-01T00:00:00Z"),
+                publishedAt = Instant.parse("2026-09-01T00:00:00Z"),
+                discoveryProvider = CandidateDiscoveryProvider.GDELT,
             ),
         )
         sourcePersistence.recordSuccess(
@@ -207,6 +209,7 @@ class FactProposalReviewServiceTest {
     @Import(
         CandidatePersistenceService::class,
         CandidateWriter::class,
+        dev.factweek.ingestion.internal.CandidateUrlNormalizer::class,
         SourceDocumentPersistenceService::class,
         SourceDocumentQueryService::class,
         FactProposalReviewService::class,
