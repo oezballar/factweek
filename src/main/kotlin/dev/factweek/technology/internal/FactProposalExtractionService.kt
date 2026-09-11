@@ -5,17 +5,14 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.beans.factory.ObjectProvider
-import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.util.Locale
-import java.util.UUID
 
 @Service
 internal class FactProposalExtractionService(
     private val sourceDocuments: SourceDocuments,
     private val extractorProvider: ObjectProvider<FactProposalExtractor>,
-    private val proposals: FactProposalRepository,
-    private val attempts: FactProposalExtractionAttemptRepository,
+    private val attemptService: FactProposalExtractionAttemptService,
     private val clock: Clock,
     meterRegistry: MeterRegistry,
 ) {
@@ -23,38 +20,44 @@ internal class FactProposalExtractionService(
     private val rejectedCounter = meterRegistry.counter("factweek.technology.fact-proposals.rejected")
     private val skippedCounter = meterRegistry.counter("factweek.technology.fact-proposals.skipped")
 
-    @Transactional
     fun extract(maximum: Int): FactProposalExtractionResult {
         if (maximum !in 1..25) throw InvalidFactProposalExtractionRequestException()
         val extractor = requireNotNull(extractorProvider.ifAvailable) { "No fact-proposal extractor is configured" }
         val metadata = extractor.metadata.validated()
-        val processedSourceDocumentIds = attempts.findProcessedSourceDocumentIds(metadata.schemaVersion).toSet()
-        val selected = sourceDocuments.findFetchedForFactProposals(maximum, processedSourceDocumentIds)
+        val nonClaimableSourceDocumentIds = attemptService.findNonClaimableSourceDocumentIds(metadata.schemaVersion)
+        val selected = sourceDocuments.findFetchedForFactProposals(maximum, nonClaimableSourceDocumentIds)
         var proposed = 0
         var rejected = 0
         var skipped = 0
 
         selected.forEach { sourceDocument ->
-            if (attempts.claim(UUID.randomUUID(), sourceDocument.id, metadata.model, metadata.schemaVersion, clock.instant()) == 0) {
+            val attemptId = attemptService.tryClaim(sourceDocument.id, metadata)
+            if (attemptId == null) {
                 skipped++
                 return@forEach
             }
-            val extracted = extractor.extract(
-                FactProposalExtractionRequest(
-                    sourceDocumentId = sourceDocument.id,
-                    sourceUrl = sourceDocument.sourceUrl,
-                    textContent = sourceDocument.textContent,
-                    contentSha256 = sourceDocument.contentSha256,
-                ),
-            )
+            val extracted = try {
+                extractor.extract(
+                    FactProposalExtractionRequest(
+                        sourceDocumentId = sourceDocument.id,
+                        sourceUrl = sourceDocument.sourceUrl,
+                        textContent = sourceDocument.textContent,
+                        contentSha256 = sourceDocument.contentSha256,
+                    ),
+                )
+            } catch (exception: RuntimeException) {
+                attemptService.markFailed(attemptId)
+                throw exception
+            }
             val seenStatements = mutableSetOf<String>()
+            val proposalsToStore = mutableListOf<FactProposalEntity>()
             extracted.forEach { proposal ->
                 val normalizedStatement = normalizeWhitespace(proposal.statement)
                 if (!isValid(sourceDocument.textContent, proposal) || !seenStatements.add(normalizedStatement)) {
                     rejected++
                     return@forEach
                 }
-                proposals.save(
+                proposalsToStore +=
                     FactProposalEntity(
                         sourceDocumentId = sourceDocument.id,
                         statement = normalizedStatement,
@@ -66,9 +69,14 @@ internal class FactProposalExtractionService(
                         extractionSchemaVersion = metadata.schemaVersion,
                         createdAt = clock.instant(),
                         entities = proposal.entities.map { EntityValue(it.name.trim(), it.type) }.toMutableList(),
-                    ),
-                )
+                    )
                 proposed++
+            }
+            try {
+                attemptService.complete(attemptId, proposalsToStore)
+            } catch (exception: RuntimeException) {
+                attemptService.markFailed(attemptId)
+                throw exception
             }
         }
 

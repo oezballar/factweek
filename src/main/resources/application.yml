@@ -24,6 +24,8 @@ factweek:
     maximum-stored-text-length: ${SOURCE_CONTENT_MAXIMUM_STORED_TEXT_LENGTH:100000}
     maximum-redirects: ${SOURCE_CONTENT_MAXIMUM_REDIRECTS:5}
     user-agent: ${SOURCE_CONTENT_USER_AGENT:Factweek/0.1 (+https://github.com/oezballar/factweek)}
+  fact-proposals:
+    claim-lease: ${FACT_PROPOSAL_CLAIM_LEASE:15m}
 
 management:
   endpoints:

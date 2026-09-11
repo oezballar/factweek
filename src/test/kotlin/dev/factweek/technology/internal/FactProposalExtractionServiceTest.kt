@@ -16,6 +16,7 @@ import dev.factweek.technology.TechnologyCategory
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -28,6 +29,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -60,7 +62,7 @@ class FactProposalExtractionServiceTest {
 
     @BeforeEach
     fun clean() {
-        attempts.deleteAllAttempts()
+        attempts.deleteAll()
         proposals.deleteAll()
         documents.deleteAll()
         candidates.deleteAll()
@@ -68,6 +70,7 @@ class FactProposalExtractionServiceTest {
         extractor.metadataValue = FactProposalExtractionMetadata("stub-model", "v1")
         extractor.failure = null
         extractor.calls.set(0)
+        extractor.transactionActiveDuringExtraction = false
     }
 
     @Test
@@ -85,6 +88,7 @@ class FactProposalExtractionServiceTest {
         assertEquals(0, second.skippedCount)
         assertEquals(1, proposals.count())
         assertEquals(1, extractor.calls.get())
+        assertFalse(extractor.transactionActiveDuringExtraction)
     }
 
     @Test
@@ -135,6 +139,70 @@ class FactProposalExtractionServiceTest {
         assertThrows<IllegalStateException> { extraction.extract(10) }
 
         assertEquals(0, proposals.count())
+        assertEquals(FactProposalExtractionAttemptStatus.FAILED, attempts.findAll().single().status)
+    }
+
+    @Test
+    fun `failed extraction attempts are retried immediately`() {
+        fetchedCandidate("retry")
+        extractor.failure = IllegalStateException("temporary extractor failure")
+
+        assertThrows<IllegalStateException> { extraction.extract(10) }
+        extractor.failure = null
+
+        val result = extraction.extract(10)
+
+        assertEquals(1, result.proposedCount)
+        assertEquals(2, extractor.calls.get())
+        assertEquals(FactProposalExtractionAttemptStatus.COMPLETED, attempts.findAll().single().status)
+    }
+
+    @Test
+    fun `expired claims can be claimed again`() {
+        val candidate = fetchedCandidate("expired-claim")
+        attempts.save(
+            FactProposalExtractionAttemptEntity(
+                id = java.util.UUID.randomUUID(),
+                sourceDocumentId = candidate.id,
+                extractionModel = "old-model",
+                extractionSchemaVersion = "v1",
+                createdAt = Instant.parse("2026-09-09T00:00:00Z"),
+                status = FactProposalExtractionAttemptStatus.CLAIMED,
+                claimedAt = Instant.parse("2026-09-09T00:00:00Z"),
+            ),
+        )
+
+        val result = extraction.extract(10)
+
+        assertEquals(1, result.proposedCount)
+        assertEquals(FactProposalExtractionAttemptStatus.COMPLETED, attempts.findAll().single().status)
+    }
+
+    @Test
+    fun `empty and invalid results complete their attempts`() {
+        fetchedCandidate("completed-empty")
+        extractor.response = emptyList()
+        extraction.extract(10)
+        assertEquals(FactProposalExtractionAttemptStatus.COMPLETED, attempts.findAll().single().status)
+
+        fetchedCandidate("completed-invalid")
+        extractor.response = listOf(validProposal(statement = " "))
+        extraction.extract(10)
+        assertEquals(
+            setOf(FactProposalExtractionAttemptStatus.COMPLETED),
+            attempts.findAll().map { it.status }.toSet(),
+        )
+    }
+
+    @Test
+    fun `persistence failure does not complete the attempt`() {
+        fetchedCandidate("persistence-failure")
+        extractor.response = listOf(validProposal(entityName = "bad\u0000entity"))
+
+        assertThrows<RuntimeException> { extraction.extract(10) }
+
+        assertEquals(0, proposals.count())
+        assertEquals(FactProposalExtractionAttemptStatus.FAILED, attempts.findAll().single().status)
     }
 
     @Test
@@ -247,10 +315,11 @@ class FactProposalExtractionServiceTest {
     private fun validProposal(
         statement: String = "A laboratory demonstrated a measurable technology result.",
         evidence: String = "The source explicitly reports a measurable technology result.",
+        entityName: String = "Example battery",
     ) = ExtractedFactProposal(
         statement = statement,
         category = TechnologyCategory.ENERGY_AND_CLIMATE,
-        entities = listOf(EntityReference("Example battery", EntityType.TECHNOLOGY)),
+        entities = listOf(EntityReference(entityName, EntityType.TECHNOLOGY)),
         occurredOn = LocalDate.of(2026, 9, 1),
         evidenceText = evidence,
         evidenceLevel = EvidenceLevel.DOCUMENTED,
@@ -265,6 +334,7 @@ class FactProposalExtractionServiceTest {
         CandidateWriter::class,
         SourceDocumentPersistenceService::class,
         SourceDocumentQueryService::class,
+        FactProposalExtractionAttemptService::class,
         FactProposalExtractionService::class,
         TestConfiguration::class,
     )
@@ -284,9 +354,11 @@ class FactProposalExtractionServiceTest {
         var response: List<ExtractedFactProposal> = emptyList()
         var failure: RuntimeException? = null
         val calls = AtomicInteger()
+        var transactionActiveDuringExtraction: Boolean = false
 
         override fun extract(request: FactProposalExtractionRequest): List<ExtractedFactProposal> {
             calls.incrementAndGet()
+            transactionActiveDuringExtraction = TransactionSynchronizationManager.isActualTransactionActive()
             failure?.let { throw it }
             return response
         }
