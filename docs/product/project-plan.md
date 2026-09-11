@@ -46,7 +46,8 @@ Deliver a personalized weekly briefing of relevant, evidenced technology changes
 - Concurrency-safe deduplication: complete.
 - Manual GDELT import: complete.
 - Source-content retrieval: complete.
-- Structured fact extraction: next milestone.
+- Fact-proposal persistence and provider-neutral extraction port: complete.
+- Productive Spring AI extraction adapter: next milestone.
 - Human review workflow: planned.
 - Weekly briefing from reviewed facts: basic structure exists; the complete vertical slice is planned.
 - Golden Dataset and evaluation: planned.
@@ -83,4 +84,4 @@ Deliver a personalized weekly briefing of relevant, evidenced technology changes
 
 ## Next milestone
 
-Extract structured fact proposals with Spring AI from reproducibly stored source content. The stored content and extracted proposals are not verified facts and remain subject to validation and review.
+Implement the productive Spring AI adapter behind the completed fact-proposal extraction port. Stored source content and FactProposals are not verified facts; a FactProposal remains in a separate lifecycle and requires validation and human review before a TechnologyFact can be published.

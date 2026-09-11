@@ -70,6 +70,8 @@ curl -X POST 'http://localhost:8080/api/v1/ingestion/source-content/fetches?maxi
 
 Stored source content is input material for later evaluation and extraction; it is not a verified fact. Source URLs are checked before every request, including redirects. DNS resolution checks cannot prevent every possible DNS-rebinding scenario; a future public or multi-tenant deployment should evaluate controlled egress.
 
+Fact-proposal persistence and its provider-neutral extraction port are available for controlled manual processing. A `FactProposal` is an unconfirmed model suggestion, not a `TechnologyFact`; it has a separate lifecycle and is never published automatically.
+
 Read the current reviewed briefing:
 
 ```bash
@@ -120,4 +122,4 @@ curl 'http://localhost:8080/api/v1/briefings/technology/current?categories=AI_AN
 
 ## Next slice
 
-Structured extraction of fact proposals with Spring AI, using the reproducibly stored source content. The resulting proposals still require validation and human review.
+Implement the productive Spring AI adapter behind the fact-proposal extraction port. Resulting proposals remain subject to deterministic validation and human review before any TechnologyFact can be published.
