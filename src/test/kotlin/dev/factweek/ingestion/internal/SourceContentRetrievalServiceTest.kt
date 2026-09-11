@@ -1,6 +1,7 @@
 package dev.factweek.ingestion.internal
 
-import dev.factweek.ingestion.GdeltCandidate
+import dev.factweek.ingestion.CandidateCaptureCommand
+import dev.factweek.ingestion.CandidateDiscoveryProvider
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -107,12 +108,13 @@ class SourceContentRetrievalServiceTest {
         assertEquals(false, documents.existsById(candidate.id))
     }
 
-    private fun candidate(path: String, discoveredAt: Instant = Instant.parse("2026-09-01T12:00:00Z")) = GdeltCandidate(
+    private fun candidate(path: String, discoveredAt: Instant = Instant.parse("2026-09-01T12:00:00Z")) = CandidateCaptureCommand(
         title = "Candidate $path",
-        url = URI.create("https://example.org/$path"),
-        sourceCountry = "DE",
+        sourceUrl = URI.create("https://example.org/$path"),
+        publisher = "Example",
         language = "de",
-        discoveredAt = discoveredAt,
+        publishedAt = discoveredAt,
+        discoveryProvider = CandidateDiscoveryProvider.GDELT,
     )
 
     @SpringBootConfiguration
@@ -121,6 +123,7 @@ class SourceContentRetrievalServiceTest {
     @Import(
         CandidatePersistenceService::class,
         CandidateWriter::class,
+        CandidateUrlNormalizer::class,
         SourceDocumentPersistenceService::class,
         SourceContentRetrievalService::class,
         TestConfiguration::class,

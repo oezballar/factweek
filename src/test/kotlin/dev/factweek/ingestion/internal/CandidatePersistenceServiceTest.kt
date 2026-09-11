@@ -1,6 +1,7 @@
 package dev.factweek.ingestion.internal
 
-import dev.factweek.ingestion.GdeltCandidate
+import dev.factweek.ingestion.CandidateCaptureCommand
+import dev.factweek.ingestion.CandidateDiscoveryProvider
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -49,12 +50,13 @@ class CandidatePersistenceServiceTest {
         val publishedAt = Instant.parse("2026-09-10T08:15:30Z")
 
         val stored = service.storeDiscovered(
-            GdeltCandidate(
+            CandidateCaptureCommand(
                 title = "  Breakthrough battery enters pilot production  ",
-                url = URI.create("HTTPS://WWW.Example.com:443/news/story?utm_source=gdelt#section"),
-                sourceCountry = "US",
+                sourceUrl = URI.create("HTTPS://WWW.Example.com:443/news/story?utm_source=gdelt"),
+                publisher = "Example",
                 language = "en",
-                discoveredAt = publishedAt,
+                publishedAt = publishedAt,
+                discoveryProvider = CandidateDiscoveryProvider.GDELT,
             ),
         )
 
@@ -70,19 +72,20 @@ class CandidatePersistenceServiceTest {
 
     @Test
     fun `does not duplicate candidates with the same canonical URL`() {
-        val first = GdeltCandidate(
+        val first = CandidateCaptureCommand(
             title = "First title wins",
-            url = URI.create("https://example.org/article#first"),
-            sourceCountry = "DE",
+            sourceUrl = URI.create("https://example.org/article"),
+            publisher = "Example",
             language = "de",
-            discoveredAt = Instant.parse("2026-09-10T08:00:00Z"),
+            publishedAt = Instant.parse("2026-09-10T08:00:00Z"),
+            discoveryProvider = CandidateDiscoveryProvider.GDELT,
         )
         val duplicate = first.copy(
             title = "Duplicate title is ignored",
-            url = URI.create("HTTPS://EXAMPLE.ORG:443/article#second"),
+            sourceUrl = URI.create("HTTPS://EXAMPLE.ORG:443/article"),
         )
 
-        val stored = service.storeDiscovered(listOf(first, duplicate))
+        val stored = listOf(first, duplicate).map(service::storeDiscovered)
 
         assertEquals(stored[0].id, stored[1].id)
         assertEquals(1, repository.count())
@@ -92,12 +95,13 @@ class CandidatePersistenceServiceTest {
 
     @Test
     fun `concurrent stores of the same canonical URL return one persisted candidate`() {
-        val candidate = GdeltCandidate(
+        val candidate = CandidateCaptureCommand(
             title = "Concurrent candidate",
-            url = URI.create("https://example.org/concurrent#first"),
-            sourceCountry = "DE",
+            sourceUrl = URI.create("https://example.org/concurrent"),
+            publisher = "Example",
             language = "de",
-            discoveredAt = Instant.parse("2026-09-10T08:00:00Z"),
+            publishedAt = Instant.parse("2026-09-10T08:00:00Z"),
+            discoveryProvider = CandidateDiscoveryProvider.GDELT,
         )
         val ready = CountDownLatch(2)
         val start = CountDownLatch(1)
@@ -127,8 +131,12 @@ class CandidatePersistenceServiceTest {
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @EnableJpaRepositories(basePackageClasses = [NewsCandidateRepository::class])
-    @Import(CandidatePersistenceService::class, CandidateWriter::class)
+    @Import(CandidatePersistenceService::class, CandidateWriter::class, CandidateUrlNormalizer::class, TestConfiguration::class)
     internal class TestApplication
+
+    internal class TestConfiguration {
+        @org.springframework.context.annotation.Bean fun clock() = java.time.Clock.systemUTC()
+    }
 
     companion object {
         @Container

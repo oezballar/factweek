@@ -2,6 +2,9 @@ package dev.factweek.ingestion.internal
 
 import dev.factweek.ingestion.GdeltCandidates
 import dev.factweek.ingestion.GdeltImportResult
+import dev.factweek.ingestion.CandidateCaptureCommand
+import dev.factweek.ingestion.CandidateCaptures
+import dev.factweek.ingestion.CandidateDiscoveryProvider
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -11,7 +14,7 @@ import java.time.Instant
 @Service
 internal class GdeltImportService(
     private val candidates: GdeltCandidates,
-    private val persistenceService: CandidatePersistenceService,
+    private val candidateCaptures: CandidateCaptures,
     meterRegistry: MeterRegistry,
 ) {
     private val discoveredCounter = meterRegistry.counter("factweek.ingestion.gdelt.candidates.discovered")
@@ -21,9 +24,9 @@ internal class GdeltImportService(
     fun import(query: String, from: Instant, to: Instant, maximum: Int): GdeltImportResult {
         validate(query, from, to, maximum)
         val discovered = candidates.findTechnologyCandidates(query, from, to, maximum)
-        val outcomes = discovered.map { persistenceService.storeDiscoveredWithOutcome(it).outcome }
-        val storedCount = outcomes.count { it == CandidatePersistenceOutcome.STORED }
-        val existingCount = outcomes.count { it == CandidatePersistenceOutcome.EXISTING }
+        val outcomes = discovered.map { candidateCaptures.capture(it.toCaptureCommand()).created }
+        val storedCount = outcomes.count { it }
+        val existingCount = outcomes.count { !it }
 
         discoveredCounter.increment(discovered.size.toDouble())
         storedCounter.increment(storedCount.toDouble())
@@ -57,5 +60,17 @@ internal class GdeltImportService(
         }
 
         private val logger = LoggerFactory.getLogger(GdeltImportService::class.java)
+    }
+
+    private fun dev.factweek.ingestion.GdeltCandidate.toCaptureCommand(): CandidateCaptureCommand {
+        val sourceUrl = java.net.URI(url.scheme, url.userInfo, url.host, url.port, url.path, url.query, null)
+        return CandidateCaptureCommand(
+            sourceUrl = sourceUrl,
+            title = title,
+            publisher = sourceUrl.host ?: throw InvalidCandidateCaptureException(),
+            publishedAt = discoveredAt,
+            language = language,
+            discoveryProvider = CandidateDiscoveryProvider.GDELT,
+        )
     }
 }

@@ -107,6 +107,7 @@ class GdeltImportServiceTest {
     @Import(
         CandidatePersistenceService::class,
         CandidateWriter::class,
+        CandidateUrlNormalizer::class,
         GdeltImportService::class,
         TestConfiguration::class,
     )
@@ -118,6 +119,9 @@ class GdeltImportServiceTest {
 
         @Bean
         fun meterRegistry(): MeterRegistry = SimpleMeterRegistry()
+
+        @Bean
+        fun clock(): java.time.Clock = java.time.Clock.systemUTC()
 
     }
 

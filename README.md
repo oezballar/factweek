@@ -73,6 +73,16 @@ curl -X POST 'http://localhost:8080/api/v1/ingestion/source-content/fetches?maxi
 
 Stored source content is input material for later evaluation and extraction; it is not a verified fact. Source URLs are checked before every request, including redirects. DNS resolution checks cannot prevent every possible DNS-rebinding scenario; a future public or multi-tenant deployment should evaluate controlled egress.
 
+Candidates can also be captured manually, without a GDELT request. Discovery provenance (`GDELT` or `MANUAL`) is stored with the candidate; capture only stores metadata and does not fetch content or call AI. The next pipeline step is the existing source-content fetch endpoint.
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/ingestion/candidates' \
+  -H 'Content-Type: application/json' \
+  -d '{"sourceUrl":"https://example.org/research/result","title":"New battery result","publisher":"Example Research Institute","publishedAt":"2026-09-11T08:00:00Z","language":"en"}'
+```
+
+Scheme and host case, default HTTP(S) ports, and an empty path are canonicalized; query parameters are retained. A repeated manual request with identical canonical URL and metadata returns the existing candidate. Different title, publisher, publication time, or language for the same canonical URL returns `409`; stored metadata is never overwritten.
+
 Fact-proposal persistence and the Spring-AI OpenAI adapter are available for controlled manual processing. A `FactProposal` is an unconfirmed model suggestion, not a `TechnologyFact`; it has a separate lifecycle and is never published automatically.
 
 Fact Proposals require an explicit human decision. Their only state transitions are `PROPOSED -> ACCEPTED` and `PROPOSED -> REJECTED`; both decision states are terminal. Accepting creates one traceable TechnologyFact in the same transaction, while rejecting requires a documented reason and creates no fact. The proposal retains the original statement and evidence; its link to the resulting TechnologyFact preserves the review provenance.
