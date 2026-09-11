@@ -13,7 +13,7 @@ services:
       timeout: 3s
       retries: 10
     volumes:
-      - factweek-postgres:/var/lib/postgresql/data
+      - factweek-postgres-18:/var/lib/postgresql
 
 volumes:
-  factweek-postgres:
+  factweek-postgres-18:

@@ -43,6 +43,8 @@ gradle wrapper --gradle-version 9.3.0
 
 The application uses `jdbc:postgresql://localhost:5432/factweek` by default. Override it with `DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD`.
 
+PostgreSQL 18 uses `/var/lib/postgresql` as the Compose volume mount path. The Compose setup therefore uses the separate `factweek-postgres-18` volume and leaves older PostgreSQL volumes untouched.
+
 ## Current vertical slice
 
 Import unverified GDELT candidates into the candidate store (this creates candidates, not reviewed or verified technology facts):
