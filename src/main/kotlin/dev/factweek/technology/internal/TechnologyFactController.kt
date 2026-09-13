@@ -27,7 +27,7 @@ internal data class PublishTechnologyFactRequest(
     val eventType: TechnologyEventType,
     val readiness: TechnologyReadiness,
     val evidenceLevel: EvidenceLevel,
-    val occurredOn: LocalDate,
+    val occurredOn: LocalDate? = null,
     val entities: List<EntityReference> = emptyList(),
     @field:NotEmpty val sources: List<SourceReference>,
 ) {

@@ -134,15 +134,19 @@ class FactProposalReviewServiceTest {
     }
 
     @Test
-    fun `accept rejects a proposal when neither reviewer nor proposal provides an occurred date`() {
+    fun `accepting a proposal without an occurred date creates an undated technology fact`() {
         val proposal = proposed(occurredOn = null)
 
-        assertThrows<InvalidFactProposalReviewRequestException> { reviews.accept(proposal.id, acceptCommand()) }
+        val result = reviews.accept(proposal.id, acceptCommand())
 
-        assertEquals(0, technologyFacts.count())
+        assertEquals(1, technologyFacts.count())
         val storedProposal = proposals.findById(proposal.id).orElseThrow()
-        assertEquals(FactProposalStatus.PROPOSED, storedProposal.status)
-        assertEquals(null, storedProposal.reviewedEvidenceLevel)
+        val fact = technologyFacts.findById(result.technologyFactId).orElseThrow()
+        assertEquals(FactProposalStatus.ACCEPTED, storedProposal.status)
+        assertEquals(EvidenceLevel.PRIMARY_CONFIRMED, storedProposal.reviewedEvidenceLevel)
+        assertEquals(null, fact.occurredOn)
+        assertEquals(EvidenceLevel.PRIMARY_CONFIRMED, fact.evidenceLevel)
+        assertEquals("https://example.org/review", fact.sources.single().url)
     }
 
     @Test

@@ -14,7 +14,7 @@ internal class TechnologyFactEntity(
     @Enumerated(EnumType.STRING) @Column(name = "event_type", nullable = false) val eventType: TechnologyEventType,
     @Enumerated(EnumType.STRING) @Column(nullable = false) val readiness: TechnologyReadiness,
     @Enumerated(EnumType.STRING) @Column(name = "evidence_level", nullable = false) val evidenceLevel: EvidenceLevel,
-    @Column(name = "occurred_on", nullable = false) val occurredOn: LocalDate,
+    @Column(name = "occurred_on") val occurredOn: LocalDate?,
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "technology_fact_entity", joinColumns = [JoinColumn(name = "fact_id")])
     val entities: MutableList<EntityValue> = mutableListOf(),

@@ -3,8 +3,10 @@ package dev.factweek.technology.internal
 import dev.factweek.technology.EvidenceLevel
 import dev.factweek.technology.TechnologyCategory
 import dev.factweek.technology.TechnologyEventType
+import dev.factweek.technology.TechnologyFacts
 import dev.factweek.technology.TechnologyReadiness
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -13,6 +15,7 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.persistence.autoconfigure.EntityScan
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
+import org.springframework.context.annotation.Import
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
@@ -29,6 +32,7 @@ import java.util.UUID
 @Testcontainers
 class TechnologyFactRepositoryTest {
     @Autowired private lateinit var repository: TechnologyFactRepository
+    @Autowired private lateinit var technologyFacts: TechnologyFacts
 
     @BeforeEach
     fun clean() = repository.deleteAll()
@@ -40,17 +44,19 @@ class TechnologyFactRepositoryTest {
         val sameDayFirstId = fact("00000000-0000-0000-0000-000000000001", LocalDate.of(2026, 9, 13))
         val before = fact("00000000-0000-0000-0000-000000000004", LocalDate.of(2026, 9, 6))
         val after = fact("00000000-0000-0000-0000-000000000005", LocalDate.of(2026, 9, 14))
-        repository.saveAll(listOf(lowerBoundary, sameDayLaterId, sameDayFirstId, before, after))
+        val undated = fact("00000000-0000-0000-0000-000000000006", null)
+        repository.saveAll(listOf(lowerBoundary, sameDayLaterId, sameDayFirstId, before, after, undated))
 
-        val results = repository.findAllByOccurredOnBetweenOrderByOccurredOnDescIdAsc(
+        val results = technologyFacts.occurredBetween(
             LocalDate.of(2026, 9, 7),
             LocalDate.of(2026, 9, 13),
         )
 
         assertEquals(listOf(sameDayFirstId.id, sameDayLaterId.id, lowerBoundary.id), results.map { it.id })
+        assertNull(repository.findById(undated.id).orElseThrow().occurredOn)
     }
 
-    private fun fact(id: String, occurredOn: LocalDate) = TechnologyFactEntity(
+    private fun fact(id: String, occurredOn: LocalDate?) = TechnologyFactEntity(
         id = UUID.fromString(id),
         statement = "A persisted technology fact.",
         category = TechnologyCategory.AI_AND_SOFTWARE,
@@ -64,6 +70,7 @@ class TechnologyFactRepositoryTest {
     @EnableAutoConfiguration
     @EntityScan(basePackageClasses = [TechnologyFactEntity::class])
     @EnableJpaRepositories(basePackageClasses = [TechnologyFactRepository::class])
+    @Import(TechnologyFactService::class)
     internal class TestApplication
 
     companion object {

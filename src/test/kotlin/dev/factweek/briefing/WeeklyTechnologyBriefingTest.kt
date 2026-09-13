@@ -83,7 +83,17 @@ class WeeklyTechnologyBriefingTest {
         assertEquals(fact.sources, result.facts.single().sources)
     }
 
-    private fun fact(id: String, occurredOn: LocalDate, category: TechnologyCategory = TechnologyCategory.AI_AND_SOFTWARE) =
+    @Test
+    fun `undated facts are excluded from date-based briefings`() {
+        val dated = fact("00000000-0000-0000-0000-000000000006", LocalDate.of(2026, 9, 10))
+        val undated = fact("00000000-0000-0000-0000-000000000007", null)
+
+        val result = WeeklyTechnologyBriefing(RecordingTechnologyFacts(listOf(undated, dated)), clock).current(emptySet(), 10)
+
+        assertEquals(listOf(dated), result.facts)
+    }
+
+    private fun fact(id: String, occurredOn: LocalDate?, category: TechnologyCategory = TechnologyCategory.AI_AND_SOFTWARE) =
         TechnologyFact(
             id = UUID.fromString(id),
             statement = "A concrete technology fact.",
