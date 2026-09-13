@@ -1,5 +1,6 @@
 package dev.factweek.technology.internal
 
+import org.springframework.ai.openai.OpenAiChatModel
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -12,7 +13,7 @@ class OpenAiFactProposalExtractorTest {
     private val client = CapturingClient()
     private val extractor = OpenAiFactProposalExtractor(
         client,
-        OpenAiFactProposalSettings("test-key", "gpt-5-mini", "technology-fact-extraction-v1", 5, 1200),
+        OpenAiFactProposalSettings("test-key", "gpt-5-mini", "technology-fact-extraction-v1", 5, 8000),
     )
 
     @Test
@@ -36,6 +37,15 @@ class OpenAiFactProposalExtractorTest {
     }
 
     @Test
+    fun `does not retry an empty adapter response`() {
+        client.response = null
+
+        assertThrows<OpenAiFactProposalAdapterException> { extractor.extract(request()) }
+
+        assertEquals(1, client.calls)
+    }
+
+    @Test
     fun `rejects unknown enum values as a controlled adapter error`() {
         client.response = response(category = "UNKNOWN_CATEGORY")
 
@@ -46,7 +56,9 @@ class OpenAiFactProposalExtractorTest {
     fun `rejects missing required fields as a controlled adapter error`() {
         client.response = OpenAiFactProposalResponse(listOf(OpenAiFactProposalDto(statement = "A claim")))
 
-        assertThrows<OpenAiFactProposalAdapterException> { extractor.extract(request()) }
+        val exception = assertThrows<OpenAiFactProposalAdapterException> { extractor.extract(request()) }
+
+        assertEquals(OpenAiFactProposalAdapterFailure.INCOMPLETE_STRUCTURED_OUTPUT, exception.failure)
     }
 
     @Test
@@ -69,6 +81,14 @@ class OpenAiFactProposalExtractorTest {
         assertEquals(1200, options.maxCompletionTokens)
         assertNull(options.maxTokens)
         assertNull(options.temperature)
+        assertEquals(OpenAiFactProposalStructuredOutput.strictSchema, options.responseFormat?.jsonSchema)
+        assertEquals(OpenAiChatModel.ResponseFormat.Type.JSON_SCHEMA, options.responseFormat?.type)
+        assertEquals(true, options.responseFormat?.strict)
+    }
+
+    @Test
+    fun `uses an eight thousand token output default`() {
+        assertEquals(8000, OpenAiFactProposalSettings.DEFAULT_MAXIMUM_OUTPUT_TOKENS)
     }
 
     @Test
@@ -90,7 +110,7 @@ class OpenAiFactProposalExtractorTest {
     fun `instructs the model to set occurred date only when explicitly supported`() {
         val prompt = OpenAiFactProposalPrompt.create(
             request(),
-            OpenAiFactProposalSettings("test-key", "gpt-5-mini", "v1", 5, 1200),
+            OpenAiFactProposalSettings("test-key", "gpt-5-mini", "v1", 5, 8000),
         )
 
         assertEquals(true, prompt.systemInstruction.contains("date when the described technology event actually occurred"))
@@ -131,8 +151,10 @@ class OpenAiFactProposalExtractorTest {
         var response: OpenAiFactProposalResponse? = null
         var prompt: OpenAiFactProposalPrompt? = null
         var transactionActiveDuringCall = false
+        var calls = 0
 
         override fun extract(prompt: OpenAiFactProposalPrompt): OpenAiFactProposalResponse? {
+            calls++
             this.prompt = prompt
             transactionActiveDuringCall = TransactionSynchronizationManager.isActualTransactionActive()
             return response

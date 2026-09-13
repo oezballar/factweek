@@ -41,7 +41,7 @@ factweek:
       model: ${OPENAI_MODEL:gpt-5-mini}
       prompt-version: ${OPENAI_PROMPT_VERSION:technology-fact-extraction-v2}
       maximum-proposals-per-document: ${OPENAI_MAX_PROPOSALS_PER_DOCUMENT:5}
-      maximum-output-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:1200}
+      maximum-output-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:8000}
 
 management:
   endpoints:
