@@ -1,13 +1,10 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.ingestion.SourceDocuments
-import dev.factweek.ingestion.CandidateSourceType
-import dev.factweek.technology.SourceType
 import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyReadiness
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.net.URI
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
@@ -24,6 +21,7 @@ internal class FactProposalReviewService(
         val proposal = findProposed(proposalId)
         val sourceDocument = sourceDocuments.findFetchedById(proposal.sourceDocumentId)
             ?: throw FactProposalReviewConflictException()
+        ReviewedEvidencePolicy.validate(sourceDocument.sourceType, command.evidenceLevel)
         val occurredOn = proposal.occurredOn ?: command.occurredOn
             ?: throw InvalidFactProposalReviewRequestException()
         val technologyFact = technologyFacts.save(

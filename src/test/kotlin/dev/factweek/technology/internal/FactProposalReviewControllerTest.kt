@@ -102,4 +102,16 @@ class FactProposalReviewControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         }
     }
+
+    @Test
+    fun `maps invalid evidence decisions to generic problem details`() {
+        val proposalId = UUID.randomUUID()
+        `when`(reviews.accept(proposalId, AcceptFactProposal(TechnologyEventType.TECHNOLOGY_DEPLOYED, TechnologyReadiness.PRODUCTION_USE, dev.factweek.technology.EvidenceLevel.PRIMARY_CONFIRMED, null)))
+            .thenThrow(InvalidReviewedEvidenceDecisionException())
+        mockMvc.perform(post("/api/v1/technology/fact-proposals/$proposalId/accept").contentType(MediaType.APPLICATION_JSON).content("""{"eventType":"TECHNOLOGY_DEPLOYED","readiness":"PRODUCTION_USE","evidenceLevel":"PRIMARY_CONFIRMED"}"""))
+            .andExpect(status().isUnprocessableEntity)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.title").value("Evidence decision cannot be accepted"))
+            .andExpect(jsonPath("$.detail").value("The selected evidence level is not allowed for this single-source proposal"))
+    }
 }

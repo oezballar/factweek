@@ -2,6 +2,7 @@ package dev.factweek.technology.internal
 
 import dev.factweek.ingestion.CandidateCaptureCommand
 import dev.factweek.ingestion.CandidateDiscoveryProvider
+import dev.factweek.ingestion.CandidateSourceType
 import dev.factweek.ingestion.internal.CandidatePersistenceService
 import dev.factweek.ingestion.internal.CandidateWriter
 import dev.factweek.ingestion.internal.NewsCandidateRepository
@@ -11,6 +12,7 @@ import dev.factweek.ingestion.internal.SourceDocumentQueryService
 import dev.factweek.ingestion.internal.SourceDocumentRepository
 import dev.factweek.technology.EntityType
 import dev.factweek.technology.EvidenceLevel
+import dev.factweek.technology.SourceType
 import dev.factweek.technology.TechnologyCategory
 import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyReadiness
@@ -85,6 +87,7 @@ class FactProposalReviewServiceTest {
         assertEquals(proposal.entities.toList(), fact.entities.toList())
         assertEquals("https://example.org/review", fact.sources.single().url)
         assertEquals("Example", fact.sources.single().publisher)
+        assertEquals(SourceType.PRIMARY_DOCUMENT, fact.sources.single().sourceType)
     }
 
     @Test
@@ -118,6 +121,33 @@ class FactProposalReviewServiceTest {
     fun `reject validation and unknown proposals fail predictably`() {
         assertThrows<InvalidFactProposalReviewRequestException> { reviews.reject(java.util.UUID.randomUUID(), " ") }
         assertThrows<FactProposalNotFoundException> { reviews.reject(java.util.UUID.randomUUID(), "Reason") }
+    }
+
+    @Test
+    fun `invalid evidence decisions leave the proposal untouched and create no fact`() {
+        val newsProposal = proposed(
+            path = "news-primary",
+            sourceType = CandidateSourceType.NEWS_REPORT,
+            suggestedEvidenceLevel = EvidenceLevel.PRIMARY_CONFIRMED,
+        )
+        assertThrows<InvalidReviewedEvidenceDecisionException> { reviews.accept(newsProposal.id, acceptCommand()) }
+
+        val unsupportedLevels = listOf(
+            EvidenceLevel.REPORTED,
+            EvidenceLevel.DOCUMENTED,
+            EvidenceLevel.INDEPENDENTLY_CONFIRMED,
+            EvidenceLevel.PROVEN_IN_USE,
+        )
+        unsupportedLevels.forEach { level ->
+            val proposal = proposed("unsupported-$level")
+            assertThrows<InvalidReviewedEvidenceDecisionException> { reviews.accept(proposal.id, acceptCommand(level)) }
+        }
+
+        assertEquals(0, technologyFacts.count())
+        proposals.findAll().forEach { proposal ->
+            assertEquals(FactProposalStatus.PROPOSED, proposal.status)
+            assertEquals(null, proposal.reviewedEvidenceLevel)
+        }
     }
 
     @Test
@@ -165,7 +195,11 @@ class FactProposalReviewServiceTest {
         }
     }
 
-    private fun proposed(path: String = "review"): FactProposalEntity {
+    private fun proposed(
+        path: String = "review",
+        sourceType: CandidateSourceType = CandidateSourceType.PRIMARY_DOCUMENT,
+        suggestedEvidenceLevel: EvidenceLevel = EvidenceLevel.DOCUMENTED,
+    ): FactProposalEntity {
         val candidate = candidatePersistence.storeDiscovered(
             CandidateCaptureCommand(
                 title = "Review candidate $path",
@@ -174,6 +208,7 @@ class FactProposalReviewServiceTest {
                 language = "en",
                 publishedAt = Instant.parse("2026-09-01T00:00:00Z"),
                 discoveryProvider = CandidateDiscoveryProvider.GDELT,
+                sourceType = sourceType,
             ),
         )
         sourcePersistence.recordSuccess(
@@ -193,7 +228,7 @@ class FactProposalReviewServiceTest {
                 category = TechnologyCategory.ENERGY_AND_CLIMATE,
                 occurredOn = LocalDate.of(2026, 9, 1),
                 evidenceText = "A battery reached a new efficiency threshold.",
-                suggestedEvidenceLevel = EvidenceLevel.DOCUMENTED,
+                suggestedEvidenceLevel = suggestedEvidenceLevel,
                 extractionModel = "test-model",
                 extractionSchemaVersion = "v1-$path",
                 createdAt = Instant.parse("2026-09-01T00:00:00Z"),
@@ -202,10 +237,10 @@ class FactProposalReviewServiceTest {
         )
     }
 
-    private fun acceptCommand() = AcceptFactProposal(
+    private fun acceptCommand(evidenceLevel: EvidenceLevel = EvidenceLevel.PRIMARY_CONFIRMED) = AcceptFactProposal(
         TechnologyEventType.PERFORMANCE_RECORD_VERIFIED,
         TechnologyReadiness.PROTOTYPE,
-        EvidenceLevel.PRIMARY_CONFIRMED,
+        evidenceLevel,
     )
 
     @SpringBootConfiguration

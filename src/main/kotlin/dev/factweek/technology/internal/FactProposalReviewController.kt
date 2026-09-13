@@ -49,6 +49,13 @@ internal class FactProposalReviewController(
     @ExceptionHandler(FactProposalNotFoundException::class)
     fun notFound(): ProblemDetail = problem(HttpStatus.NOT_FOUND, "Fact proposal was not found")
 
+    @ExceptionHandler(InvalidReviewedEvidenceDecisionException::class)
+    fun invalidEvidenceDecision(): ProblemDetail {
+        val problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, "The selected evidence level is not allowed for this single-source proposal")
+        problem.title = "Evidence decision cannot be accepted"
+        return problem
+    }
+
     @ExceptionHandler(
         FactProposalReviewConflictException::class,
         OptimisticLockingFailureException::class,
