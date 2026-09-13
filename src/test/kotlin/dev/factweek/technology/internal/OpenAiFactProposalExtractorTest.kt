@@ -87,6 +87,19 @@ class OpenAiFactProposalExtractorTest {
     }
 
     @Test
+    fun `instructs the model to set occurred date only when explicitly supported`() {
+        val prompt = OpenAiFactProposalPrompt.create(
+            request(),
+            OpenAiFactProposalSettings("test-key", "gpt-5-mini", "v1", 5, 1200),
+        )
+
+        assertEquals(true, prompt.systemInstruction.contains("date when the described technology event actually occurred"))
+        assertEquals(true, prompt.systemInstruction.contains("explicitly supported by the source content"))
+        assertEquals(true, prompt.systemInstruction.contains("Never infer it solely from a publication date"))
+        assertEquals(true, prompt.systemInstruction.contains("Return null when no explicitly supported event date is available"))
+    }
+
+    @Test
     fun `fails clearly when enabled adapter has no key`() {
         val error = assertThrows<IllegalArgumentException> {
             OpenAiFactProposalSettings("", "gpt-5-mini", "v1", 1, 100)

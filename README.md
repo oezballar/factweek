@@ -87,7 +87,7 @@ Fact-proposal persistence and the Spring-AI OpenAI adapter are available for con
 
 Fact Proposals require an explicit human decision. `suggestedEvidenceLevel` is only the LLM suggestion, `reviewedEvidenceLevel` is the explicit reviewer decision, and `TechnologyFact.evidenceLevel` is final. Their only state transitions are `PROPOSED -> ACCEPTED` and `PROPOSED -> REJECTED`; both decision states are terminal.
 
-Accept a proposal with the reviewer-supplied event classification, readiness, and date. The example date is supplied by the reviewer; it is not inferred automatically. `occurredOn` may be omitted only when the proposal already contains an extracted date:
+Accept a proposal with the reviewer-supplied event classification, readiness, and date. An explicitly supplied reviewer date takes precedence over an extracted proposal date; if omitted, `occurredOn` may be taken from the proposal only when the source explicitly supports that event date. The example date is supplied by the reviewer; it is not inferred automatically:
 
 ```bash
 curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/PROPOSAL_ID/accept' \
