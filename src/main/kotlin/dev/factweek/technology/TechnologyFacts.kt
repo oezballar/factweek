@@ -14,7 +14,7 @@ data class PublishTechnologyFact(
     val eventType: TechnologyEventType,
     val readiness: TechnologyReadiness,
     val evidenceLevel: EvidenceLevel,
-    val occurredOn: LocalDate,
+    val occurredOn: LocalDate?,
     val entities: List<EntityReference>,
     val sources: List<SourceReference>,
 )

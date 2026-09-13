@@ -19,8 +19,9 @@ class WeeklyTechnologyBriefing(
         val appliedCategories = categories.ifEmpty { TechnologyCategory.entries.toSet() }.sortedBy { it.name }
         val facts = technologyFacts.occurredBetween(from, today)
             .asSequence()
+            .filter { it.occurredOn != null }
             .filter { it.category in appliedCategories }
-            .sortedWith(compareByDescending<TechnologyFact> { it.occurredOn }.thenBy { it.id })
+            .sortedWith(compareByDescending<TechnologyFact> { requireNotNull(it.occurredOn) }.thenBy { it.id })
             .take(maximum)
             .toList()
         return CurrentTechnologyBriefing(
