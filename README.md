@@ -126,7 +126,7 @@ Then trigger at most one selected source document:
 curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/extractions?maximum=1'
 ```
 
-Each selected source document causes a billable OpenAI API request. `OPENAI_MODEL`, `OPENAI_PROMPT_VERSION`, `OPENAI_MAX_PROPOSALS_PER_DOCUMENT` (maximum 5), and `OPENAI_MAX_OUTPUT_TOKENS` are optional tuning variables. Do not put a key in configuration files. Disable the adapter by leaving `FACTWEEK_OPENAI_ENABLED` unset or `false` and `SPRING_AI_MODEL_CHAT=none`.
+Each selected source document causes a billable OpenAI API request. `OPENAI_MODEL`, `OPENAI_PROMPT_VERSION`, `OPENAI_MAX_PROPOSALS_PER_DOCUMENT` (maximum 5), and `OPENAI_MAX_OUTPUT_TOKENS` are optional tuning variables. `OPENAI_MAX_OUTPUT_TOKENS` defaults to `8000`; it is an output ceiling, not a guaranteed token consumption. The adapter keeps OpenAI native Structured Outputs and treats empty or invalid responses as failed extraction attempts without logging response content. Do not put a key in configuration files. Disable the adapter by leaving `FACTWEEK_OPENAI_ENABLED` unset or `false` and `SPRING_AI_MODEL_CHAT=none`.
 
 The OpenAI adapter uses a dedicated Strict Structured Outputs schema rather than Spring AI's generated Kotlin DTO schema. Nullable DTO properties with default values are otherwise emitted as optional properties, while OpenAI requires every object property to appear in `required`. The adapter schema instead makes every property required, represents the optional occurrence date as `string | null`, and disables additional properties recursively. A regression test verifies these invariants for every nested object.
 
