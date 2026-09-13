@@ -68,17 +68,15 @@ internal class SpringAiOpenAiFactProposalClient(
         outcome: String,
         startedAt: Long,
     ) {
-        val event = logger.atInfo()
-            .addKeyValue("sourceDocumentId", prompt.sourceDocumentId)
-            .addKeyValue("model", metadata?.model ?: prompt.model)
-            .addKeyValue("schemaVersion", prompt.schemaVersion)
-            .addKeyValue("outcome", outcome)
-            .addKeyValue("durationMs", (System.nanoTime() - startedAt) / 1_000_000)
-        metadata?.finishReason?.let { event.addKeyValue("finishReason", it) }
-        metadata?.promptTokens?.let { event.addKeyValue("promptTokens", it) }
-        metadata?.completionTokens?.let { event.addKeyValue("completionTokens", it) }
-        metadata?.totalTokens?.let { event.addKeyValue("totalTokens", it) }
-        event.log("openai_fact_proposal_response_processed")
+        OpenAiFactProposalEventLogging.response(
+            logger = logger,
+            sourceDocumentId = prompt.sourceDocumentId,
+            model = metadata?.model ?: prompt.model,
+            schemaVersion = prompt.schemaVersion,
+            outcome = outcome,
+            durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+            metadata = metadata,
+        )
     }
 
     private companion object {

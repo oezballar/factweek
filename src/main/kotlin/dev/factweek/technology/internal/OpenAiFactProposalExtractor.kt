@@ -30,13 +30,14 @@ internal class OpenAiFactProposalExtractor(
             throw OpenAiFactProposalAdapterException("OpenAI returned more proposals than requested")
         }
         val mapped = proposals.map(::mapProposal)
-        logger.atInfo()
-            .addKeyValue("sourceDocumentId", request.sourceDocumentId)
-            .addKeyValue("model", settings.model)
-            .addKeyValue("schemaVersion", settings.promptVersion)
-            .addKeyValue("durationMs", (System.nanoTime() - startedAt) / 1_000_000)
-            .addKeyValue("resultCount", mapped.size)
-            .log("openai_fact_proposal_extraction_completed")
+        OpenAiFactProposalEventLogging.extractionCompleted(
+            logger = logger,
+            sourceDocumentId = request.sourceDocumentId,
+            model = settings.model,
+            schemaVersion = settings.promptVersion,
+            durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+            resultCount = mapped.size,
+        )
         return mapped
     }
 
