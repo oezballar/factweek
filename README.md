@@ -85,7 +85,7 @@ Scheme and host case, default HTTP(S) ports, and an empty path are canonicalized
 
 Fact-proposal persistence and the Spring-AI OpenAI adapter are available for controlled manual processing. A `FactProposal` is an unconfirmed model suggestion, not a `TechnologyFact`; it has a separate lifecycle and is never published automatically.
 
-Fact Proposals require an explicit human decision. Their only state transitions are `PROPOSED -> ACCEPTED` and `PROPOSED -> REJECTED`; both decision states are terminal. Accepting creates one traceable TechnologyFact in the same transaction, while rejecting requires a documented reason and creates no fact. The proposal retains the original statement and evidence; its link to the resulting TechnologyFact preserves the review provenance.
+Fact Proposals require an explicit human decision. `suggestedEvidenceLevel` is only the LLM suggestion, `reviewedEvidenceLevel` is the explicit reviewer decision, and `TechnologyFact.evidenceLevel` is final. Their only state transitions are `PROPOSED -> ACCEPTED` and `PROPOSED -> REJECTED`; both decision states are terminal.
 
 Accept a proposal with the reviewer-supplied event classification, readiness, and date. The example date is supplied by the reviewer; it is not inferred automatically. `occurredOn` may be omitted only when the proposal already contains an extracted date:
 
@@ -95,9 +95,12 @@ curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/PROPOSAL_ID
   -d '{
     "eventType": "TECHNOLOGY_DEPLOYED",
     "readiness": "PRODUCTION_USE",
+    "evidenceLevel": "PRIMARY_CONFIRMED",
     "occurredOn": "2026-09-11"
   }'
 ```
+
+With one source, only an explicitly selected `PRIMARY_CONFIRMED` level is currently accepted, and only for `PRIMARY_DOCUMENT`, `PAPER`, `DATASET`, `REPOSITORY`, or `REGULATOR`. `REPORTED` and `DOCUMENTED` cannot be final Technology Fact evidence levels. A suitable source type does not cause automatic Evidenzhochstufung. `NEWS_REPORT` requires independent confirmation that is not implemented yet; `INDEPENDENTLY_CONFIRMED` and `PROVEN_IN_USE` are not allowed with one source. Missing or unknown evidence levels return 400, decided proposals return 409, and a syntactically valid but unsuitable evidence decision returns 422.
 
 Reject a proposal with a non-empty reason:
 

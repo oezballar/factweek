@@ -1,13 +1,10 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.ingestion.SourceDocuments
-import dev.factweek.ingestion.CandidateSourceType
-import dev.factweek.technology.SourceType
 import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyReadiness
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.net.URI
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
@@ -24,6 +21,7 @@ internal class FactProposalReviewService(
         val proposal = findProposed(proposalId)
         val sourceDocument = sourceDocuments.findFetchedById(proposal.sourceDocumentId)
             ?: throw FactProposalReviewConflictException()
+        ReviewedEvidencePolicy.validate(sourceDocument.sourceType, command.evidenceLevel)
         val occurredOn = proposal.occurredOn ?: command.occurredOn
             ?: throw InvalidFactProposalReviewRequestException()
         val technologyFact = technologyFacts.save(
@@ -32,7 +30,7 @@ internal class FactProposalReviewService(
                 category = proposal.category,
                 eventType = command.eventType,
                 readiness = command.readiness,
-                evidenceLevel = proposal.evidenceLevel,
+                evidenceLevel = command.evidenceLevel,
                 occurredOn = occurredOn,
                 entities = proposal.entities.map { EntityValue(it.name, it.type) }.toMutableList(),
                 sources = mutableListOf(
@@ -46,6 +44,7 @@ internal class FactProposalReviewService(
         )
         val reviewedAt = clock.instant()
         proposal.status = FactProposalStatus.ACCEPTED
+        proposal.reviewedEvidenceLevel = command.evidenceLevel
         proposal.technologyFactId = technologyFact.id
         proposal.reviewedAt = reviewedAt
         proposal.rejectionReason = null
@@ -80,6 +79,7 @@ internal class FactProposalReviewService(
 internal data class AcceptFactProposal(
     val eventType: TechnologyEventType,
     val readiness: TechnologyReadiness,
+    val evidenceLevel: dev.factweek.technology.EvidenceLevel,
     val occurredOn: LocalDate? = null,
 )
 
