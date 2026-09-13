@@ -30,13 +30,13 @@ class FactProposalReviewControllerTest {
     fun `accept returns review result`() {
         val proposalId = UUID.randomUUID()
         val factId = UUID.randomUUID()
-        `when`(reviews.accept(proposalId, AcceptFactProposal(TechnologyEventType.TECHNOLOGY_DEPLOYED, TechnologyReadiness.PRODUCTION_USE, null)))
+        `when`(reviews.accept(proposalId, AcceptFactProposal(TechnologyEventType.TECHNOLOGY_DEPLOYED, TechnologyReadiness.PRODUCTION_USE, dev.factweek.technology.EvidenceLevel.PRIMARY_CONFIRMED, null)))
             .thenReturn(AcceptedFactProposalReview(proposalId, FactProposalStatus.ACCEPTED, factId, Instant.parse("2026-09-10T00:00:00Z")))
 
         mockMvc.perform(
             post("/api/v1/technology/fact-proposals/$proposalId/accept")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"eventType":"TECHNOLOGY_DEPLOYED","readiness":"PRODUCTION_USE"}"""),
+                .content("""{"eventType":"TECHNOLOGY_DEPLOYED","readiness":"PRODUCTION_USE","evidenceLevel":"PRIMARY_CONFIRMED"}"""),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.proposalId").value(proposalId.toString()))
@@ -88,5 +88,18 @@ class FactProposalReviewControllerTest {
             .andExpect(status().isBadRequest)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.detail").value("A valid fact-proposal review request body is required"))
+    }
+
+    @Test
+    fun `accept requires a known evidence level`() {
+        val proposalId = UUID.randomUUID()
+        listOf(
+            """{"eventType":"TECHNOLOGY_DEPLOYED","readiness":"PRODUCTION_USE"}""",
+            """{"eventType":"TECHNOLOGY_DEPLOYED","readiness":"PRODUCTION_USE","evidenceLevel":"UNKNOWN"}""",
+        ).forEach { request ->
+            mockMvc.perform(post("/api/v1/technology/fact-proposals/$proposalId/accept").contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        }
     }
 }

@@ -64,7 +64,7 @@ internal class FactProposalExtractionService(
                         category = proposal.category,
                         occurredOn = proposal.occurredOn,
                         evidenceText = normalizeWhitespace(proposal.evidenceText),
-                        evidenceLevel = proposal.evidenceLevel,
+                        suggestedEvidenceLevel = proposal.evidenceLevel,
                         extractionModel = metadata.model,
                         extractionSchemaVersion = metadata.schemaVersion,
                         createdAt = clock.instant(),

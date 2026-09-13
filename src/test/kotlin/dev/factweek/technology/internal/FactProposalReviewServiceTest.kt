@@ -77,6 +77,9 @@ class FactProposalReviewServiceTest {
         assertEquals(FactProposalStatus.ACCEPTED, storedProposal.status)
         assertEquals(result.technologyFactId, storedProposal.technologyFactId)
         assertEquals(Instant.parse("2026-09-10T00:00:00Z"), storedProposal.reviewedAt)
+        assertEquals(EvidenceLevel.DOCUMENTED, storedProposal.suggestedEvidenceLevel)
+        assertEquals(EvidenceLevel.PRIMARY_CONFIRMED, storedProposal.reviewedEvidenceLevel)
+        assertEquals(EvidenceLevel.PRIMARY_CONFIRMED, fact.evidenceLevel)
         assertEquals(1, technologyFacts.count())
         assertEquals(proposal.statement, fact.statement)
         assertEquals(proposal.entities.toList(), fact.entities.toList())
@@ -94,6 +97,8 @@ class FactProposalReviewServiceTest {
         assertEquals(FactProposalStatus.REJECTED, result.proposalStatus)
         assertEquals("Insufficient independent corroboration", storedProposal.rejectionReason)
         assertEquals(Instant.parse("2026-09-10T00:00:00Z"), storedProposal.reviewedAt)
+        assertEquals(EvidenceLevel.DOCUMENTED, storedProposal.suggestedEvidenceLevel)
+        assertEquals(null, storedProposal.reviewedEvidenceLevel)
         assertEquals(0, technologyFacts.count())
     }
 
@@ -188,7 +193,7 @@ class FactProposalReviewServiceTest {
                 category = TechnologyCategory.ENERGY_AND_CLIMATE,
                 occurredOn = LocalDate.of(2026, 9, 1),
                 evidenceText = "A battery reached a new efficiency threshold.",
-                evidenceLevel = EvidenceLevel.DOCUMENTED,
+                suggestedEvidenceLevel = EvidenceLevel.DOCUMENTED,
                 extractionModel = "test-model",
                 extractionSchemaVersion = "v1-$path",
                 createdAt = Instant.parse("2026-09-01T00:00:00Z"),
@@ -200,6 +205,7 @@ class FactProposalReviewServiceTest {
     private fun acceptCommand() = AcceptFactProposal(
         TechnologyEventType.PERFORMANCE_RECORD_VERIFIED,
         TechnologyReadiness.PROTOTYPE,
+        EvidenceLevel.PRIMARY_CONFIRMED,
     )
 
     @SpringBootConfiguration

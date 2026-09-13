@@ -32,7 +32,7 @@ internal class FactProposalReviewService(
                 category = proposal.category,
                 eventType = command.eventType,
                 readiness = command.readiness,
-                evidenceLevel = proposal.evidenceLevel,
+                evidenceLevel = command.evidenceLevel,
                 occurredOn = occurredOn,
                 entities = proposal.entities.map { EntityValue(it.name, it.type) }.toMutableList(),
                 sources = mutableListOf(
@@ -46,6 +46,7 @@ internal class FactProposalReviewService(
         )
         val reviewedAt = clock.instant()
         proposal.status = FactProposalStatus.ACCEPTED
+        proposal.reviewedEvidenceLevel = command.evidenceLevel
         proposal.technologyFactId = technologyFact.id
         proposal.reviewedAt = reviewedAt
         proposal.rejectionReason = null
@@ -80,6 +81,7 @@ internal class FactProposalReviewService(
 internal data class AcceptFactProposal(
     val eventType: TechnologyEventType,
     val readiness: TechnologyReadiness,
+    val evidenceLevel: dev.factweek.technology.EvidenceLevel,
     val occurredOn: LocalDate? = null,
 )
 
