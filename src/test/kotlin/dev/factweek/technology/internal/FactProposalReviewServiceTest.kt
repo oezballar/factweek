@@ -82,6 +82,7 @@ class FactProposalReviewServiceTest {
         assertEquals(EvidenceLevel.DOCUMENTED, storedProposal.suggestedEvidenceLevel)
         assertEquals(EvidenceLevel.PRIMARY_CONFIRMED, storedProposal.reviewedEvidenceLevel)
         assertEquals(EvidenceLevel.PRIMARY_CONFIRMED, fact.evidenceLevel)
+        assertEquals(LocalDate.of(2026, 9, 1), fact.occurredOn)
         assertEquals(1, technologyFacts.count())
         assertEquals(proposal.statement, fact.statement)
         assertEquals(proposal.entities.toList(), fact.entities.toList())
@@ -121,6 +122,27 @@ class FactProposalReviewServiceTest {
     fun `reject validation and unknown proposals fail predictably`() {
         assertThrows<InvalidFactProposalReviewRequestException> { reviews.reject(java.util.UUID.randomUUID(), " ") }
         assertThrows<FactProposalNotFoundException> { reviews.reject(java.util.UUID.randomUUID(), "Reason") }
+    }
+
+    @Test
+    fun `reviewer occurred date overrides an extracted proposal date`() {
+        val proposal = proposed(occurredOn = LocalDate.of(2026, 9, 1))
+
+        val result = reviews.accept(proposal.id, acceptCommand(occurredOn = LocalDate.of(2026, 9, 4)))
+
+        assertEquals(LocalDate.of(2026, 9, 4), technologyFacts.findById(result.technologyFactId).orElseThrow().occurredOn)
+    }
+
+    @Test
+    fun `accept rejects a proposal when neither reviewer nor proposal provides an occurred date`() {
+        val proposal = proposed(occurredOn = null)
+
+        assertThrows<InvalidFactProposalReviewRequestException> { reviews.accept(proposal.id, acceptCommand()) }
+
+        assertEquals(0, technologyFacts.count())
+        val storedProposal = proposals.findById(proposal.id).orElseThrow()
+        assertEquals(FactProposalStatus.PROPOSED, storedProposal.status)
+        assertEquals(null, storedProposal.reviewedEvidenceLevel)
     }
 
     @Test
@@ -199,6 +221,7 @@ class FactProposalReviewServiceTest {
         path: String = "review",
         sourceType: CandidateSourceType = CandidateSourceType.PRIMARY_DOCUMENT,
         suggestedEvidenceLevel: EvidenceLevel = EvidenceLevel.DOCUMENTED,
+        occurredOn: LocalDate? = LocalDate.of(2026, 9, 1),
     ): FactProposalEntity {
         val candidate = candidatePersistence.storeDiscovered(
             CandidateCaptureCommand(
@@ -226,7 +249,7 @@ class FactProposalReviewServiceTest {
                 sourceDocumentId = candidate.id,
                 statement = "A battery reached a new efficiency threshold.",
                 category = TechnologyCategory.ENERGY_AND_CLIMATE,
-                occurredOn = LocalDate.of(2026, 9, 1),
+                occurredOn = occurredOn,
                 evidenceText = "A battery reached a new efficiency threshold.",
                 suggestedEvidenceLevel = suggestedEvidenceLevel,
                 extractionModel = "test-model",
@@ -237,10 +260,14 @@ class FactProposalReviewServiceTest {
         )
     }
 
-    private fun acceptCommand(evidenceLevel: EvidenceLevel = EvidenceLevel.PRIMARY_CONFIRMED) = AcceptFactProposal(
+    private fun acceptCommand(
+        evidenceLevel: EvidenceLevel = EvidenceLevel.PRIMARY_CONFIRMED,
+        occurredOn: LocalDate? = null,
+    ) = AcceptFactProposal(
         TechnologyEventType.PERFORMANCE_RECORD_VERIFIED,
         TechnologyReadiness.PROTOTYPE,
         evidenceLevel,
+        occurredOn,
     )
 
     @SpringBootConfiguration

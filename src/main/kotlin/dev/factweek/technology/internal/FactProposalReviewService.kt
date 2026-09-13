@@ -22,7 +22,7 @@ internal class FactProposalReviewService(
         val sourceDocument = sourceDocuments.findFetchedById(proposal.sourceDocumentId)
             ?: throw FactProposalReviewConflictException()
         ReviewedEvidencePolicy.validate(sourceDocument.sourceType, command.evidenceLevel)
-        val occurredOn = proposal.occurredOn ?: command.occurredOn
+        val occurredOn = command.occurredOn ?: proposal.occurredOn
             ?: throw InvalidFactProposalReviewRequestException()
         val technologyFact = technologyFacts.save(
             TechnologyFactEntity(
