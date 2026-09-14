@@ -33,21 +33,11 @@ internal class TechnologyFactService(
         repository.findAllByOccurredOnBetweenOrderByOccurredOnDescIdAsc(from, to).map { it.toDomain() }
 
     @Transactional(readOnly = true)
-    override fun relevantForBriefingBetween(from: LocalDate, to: LocalDate): List<BriefingRelevantTechnologyFact> {
+    override fun relevantForBriefingBetween(from: LocalDate, to: LocalDate): List<TechnologyFact> {
         val sourceFrom = from.atStartOfDay(ZoneOffset.UTC).toInstant()
         val sourceToExclusive = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant()
         return repository.findAllRelevantForBriefing(from, to, sourceFrom, sourceToExclusive)
-            .mapNotNull(::toBriefingRelevantFact)
-            .filter { it.reference.date in from..to }
-    }
-
-    private fun toBriefingRelevantFact(entity: TechnologyFactEntity): BriefingRelevantTechnologyFact? {
-        val reference = entity.occurredOn?.let { BriefingReference(it, BriefingReferenceBasis.OCCURRED_ON) }
-            ?: entity.sources.mapNotNull { it.publishedAt }.minOrNull()?.let { publishedAt ->
-                BriefingReference(publishedAt.atZone(ZoneOffset.UTC).toLocalDate(), BriefingReferenceBasis.SOURCE_PUBLISHED_AT)
-            }
-            ?: return null
-        return BriefingRelevantTechnologyFact(entity.toDomain(), reference)
+            .map { it.toDomain() }
     }
 }
 

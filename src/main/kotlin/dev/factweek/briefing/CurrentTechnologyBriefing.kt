@@ -2,7 +2,6 @@ package dev.factweek.briefing
 
 import dev.factweek.technology.TechnologyCategory
 import dev.factweek.technology.TechnologyFact
-import dev.factweek.technology.BriefingReferenceBasis
 import dev.factweek.technology.EntityReference
 import dev.factweek.technology.EvidenceLevel
 import dev.factweek.technology.SourceReference

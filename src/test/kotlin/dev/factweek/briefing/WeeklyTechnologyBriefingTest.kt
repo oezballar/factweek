@@ -3,9 +3,6 @@ package dev.factweek.briefing
 import dev.factweek.technology.EntityReference
 import dev.factweek.technology.EntityType
 import dev.factweek.technology.EvidenceLevel
-import dev.factweek.technology.BriefingReference
-import dev.factweek.technology.BriefingReferenceBasis
-import dev.factweek.technology.BriefingRelevantTechnologyFact
 import dev.factweek.technology.PublishTechnologyFact
 import dev.factweek.technology.SourceReference
 import dev.factweek.technology.SourceType
@@ -116,6 +113,23 @@ class WeeklyTechnologyBriefingTest {
         assertEquals(BriefingReferenceBasis.SOURCE_PUBLISHED_AT, result.facts.single().referenceDateBasis)
     }
 
+    @Test
+    fun `occurred date takes precedence over a different source publication date`() {
+        val occurredOn = LocalDate.of(2026, 9, 11)
+        val fact = fact(
+            "00000000-0000-0000-0000-000000000010",
+            occurredOn,
+            sources = listOf(
+                SourceReference("https://example.org/source", "Example", SourceType.PAPER, Instant.parse("2026-09-08T00:00:00Z")),
+            ),
+        )
+
+        val result = WeeklyTechnologyBriefing(RecordingTechnologyFacts(listOf(fact)), clock).current(emptySet(), 10)
+
+        assertEquals(occurredOn, result.facts.single().referenceDate)
+        assertEquals(BriefingReferenceBasis.OCCURRED_ON, result.facts.single().referenceDateBasis)
+    }
+
     private fun fact(
         id: String,
         occurredOn: LocalDate?,
@@ -148,17 +162,10 @@ class WeeklyTechnologyBriefingTest {
             return facts
         }
 
-        override fun relevantForBriefingBetween(from: LocalDate, to: LocalDate): List<BriefingRelevantTechnologyFact> {
+        override fun relevantForBriefingBetween(from: LocalDate, to: LocalDate): List<TechnologyFact> {
             this.from = from
             this.to = to
-            return facts.mapNotNull { fact ->
-                val reference = fact.occurredOn?.let {
-                    BriefingReference(it, BriefingReferenceBasis.OCCURRED_ON)
-                } ?: fact.sources.mapNotNull { it.publishedAt }.minOrNull()?.let {
-                    BriefingReference(it.atZone(ZoneOffset.UTC).toLocalDate(), BriefingReferenceBasis.SOURCE_PUBLISHED_AT)
-                } ?: return@mapNotNull null
-                BriefingRelevantTechnologyFact(fact, reference)
-            }
+            return facts
         }
     }
 
