@@ -27,5 +27,5 @@ data class FetchedSourceDocument(
     val publisher: String,
     val sourceType: CandidateSourceType,
     /** Optional publication timestamp supplied by the candidate's discovery adapter. */
-    val publishedAt: Instant?,
+    val publishedAt: Instant? = null,
 )

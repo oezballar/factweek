@@ -101,6 +101,7 @@ class WeeklyTechnologyBriefingControllerTest {
 
         mockMvc.perform(get("/api/v1/briefings/technology/current"))
             .andExpect(status().isOk)
+            .andExpect(jsonPath("$.factCount").value(1))
             .andExpect(jsonPath("$.facts[0].statement").value("A fact without an event date."))
             .andExpect(jsonPath("$.facts[0].sources[0].url").value("https://example.org/source"))
             .andExpect(jsonPath("$.facts[0].referenceDate").value("2026-09-09"))
@@ -125,6 +126,7 @@ class WeeklyTechnologyBriefingControllerTest {
 
         mockMvc.perform(get("/api/v1/briefings/technology/current"))
             .andExpect(status().isOk)
+            .andExpect(jsonPath("$.factCount").value(1))
             .andExpect(jsonPath("$.facts[0].statement").value("A fact with an event date."))
             .andExpect(jsonPath("$.facts[0].sources[0].url").value("https://example.org/source"))
             .andExpect(jsonPath("$.facts[0].occurredOn").value("2026-09-10"))
@@ -142,7 +144,7 @@ class WeeklyTechnologyBriefingControllerTest {
         generatedAt = Instant.parse("2026-09-13T12:00:00Z"),
         appliedCategories = categories,
         requestedMaximum = requestedMaximum,
-        factCount = 0,
+        factCount = facts.size,
         facts = facts,
     )
 }
