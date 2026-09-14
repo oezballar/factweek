@@ -1,7 +1,6 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.technology.EvidenceLevel
-import dev.factweek.technology.BriefingReferenceBasis
 import dev.factweek.technology.TechnologyCategory
 import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyFacts
@@ -99,13 +98,9 @@ class TechnologyFactRepositoryTest {
 
         assertEquals(
             setOf(occurredInside.id, earliestInside.id, duplicateCandidates.id),
-            results.map { it.fact.id }.toSet(),
+            results.map { it.id }.toSet(),
         )
         assertEquals(3, results.size)
-        assertEquals(BriefingReferenceBasis.OCCURRED_ON, results.single { it.fact.id == occurredInside.id }.reference.basis)
-        assertEquals(LocalDate.of(2026, 9, 10), results.single { it.fact.id == occurredInside.id }.reference.date)
-        assertEquals(BriefingReferenceBasis.SOURCE_PUBLISHED_AT, results.single { it.fact.id == earliestInside.id }.reference.basis)
-        assertEquals(LocalDate.of(2026, 9, 7), results.single { it.fact.id == earliestInside.id }.reference.date)
     }
 
     @Test
