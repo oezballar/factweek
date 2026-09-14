@@ -69,7 +69,9 @@ internal class GdeltImportService(
             sourceUrl = sourceUrl,
             title = title,
             publisher = sourceUrl.host ?: throw InvalidCandidateCaptureException(),
-            publishedAt = discoveredAt,
+            // GDELT DOC's `seendate` is an observation timestamp, not a verified source
+            // publication timestamp. Do not promote it to source provenance.
+            publishedAt = null,
             language = language,
             discoveryProvider = CandidateDiscoveryProvider.GDELT,
             sourceType = CandidateSourceType.NEWS_REPORT,

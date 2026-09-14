@@ -87,7 +87,7 @@ Fact-proposal persistence and the Spring-AI OpenAI adapter are available for con
 
 Fact Proposals require an explicit human decision. `suggestedEvidenceLevel` is only the LLM suggestion, `reviewedEvidenceLevel` is the explicit reviewer decision, and `TechnologyFact.evidenceLevel` is final. Their only state transitions are `PROPOSED -> ACCEPTED` and `PROPOSED -> REJECTED`; both decision states are terminal.
 
-Accept a proposal with the reviewer-supplied event classification, readiness, and date. An explicitly supplied reviewer date takes precedence over an extracted proposal date; if omitted, `occurredOn` may be taken from the proposal only when the source explicitly supports that event date. If neither provides an adequately supported date, the fact is accepted with an unknown `occurredOn`; publication, creation, review, and current dates are never used as fallbacks. `occurredBetween` and date-based briefings include only facts with a known event date. The example date is supplied by the reviewer; it is not inferred automatically:
+Accept a proposal with the reviewer-supplied event classification, readiness, and date. An explicitly supplied reviewer date takes precedence over an extracted proposal date; if omitted, `occurredOn` may be taken from the proposal only when the source explicitly supports that event date. If neither provides an adequately supported date, the fact is accepted with an unknown `occurredOn`; publication, creation, review, and current dates are never used as fallbacks. The example date is supplied by the reviewer; it is not inferred automatically:
 
 ```bash
 curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/PROPOSAL_ID/accept' \
@@ -140,6 +140,8 @@ curl 'http://localhost:8080/api/v1/briefings/technology/current'
 
 `current` is a rolling seven-calendar-day window, not an ISO calendar week: it includes today and the preceding six calendar days. For example, a Sunday request covers Monday through Sunday. The endpoint returns facts and transparent selection metadata only; it does not generate narrative text. `maximum` defaults to `10` and accepts values from `1` through `50`.
 
+`occurredOn` remains exclusively the date on which the asserted event happened. Each source may additionally carry `publishedAt`, the publication timestamp of that concrete source. Discovery and fetch timestamps are technical ingestion metadata and are never substituted for either value. Briefing selection prefers `occurredOn`; only when it is unknown does it use the earliest reliable source `publishedAt` (as a UTC calendar date). Each briefing item exposes `referenceDate` and `referenceDateBasis`; facts with neither value are not assigned to a dated briefing.
+
 Request a smaller result set without category filtering:
 
 ```bash
@@ -170,7 +172,9 @@ The response is a fact structure with the applied range, filters, and limit:
     "evidenceLevel": "PRIMARY_CONFIRMED",
     "occurredOn": "2026-09-11",
     "entities": [{"name": "Example technology", "type": "TECHNOLOGY"}],
-    "sources": [{"url": "https://example.org/source", "publisher": "Example", "sourceType": "NEWS_REPORT"}]
+    "sources": [{"url": "https://example.org/source", "publisher": "Example", "sourceType": "NEWS_REPORT", "publishedAt": "2026-09-11T08:00:00Z"}],
+    "referenceDate": "2026-09-11",
+    "referenceDateBasis": "OCCURRED_ON"
   }]
 }
 ```
@@ -191,7 +195,8 @@ curl -X POST 'http://localhost:8080/api/v1/technology/facts' \
     "sources": [{
       "url": "https://example.org/paper",
       "publisher": "Example Journal",
-      "sourceType": "PAPER"
+      "sourceType": "PAPER",
+      "publishedAt": "2026-09-10T08:00:00Z"
     }]
   }'
 ```

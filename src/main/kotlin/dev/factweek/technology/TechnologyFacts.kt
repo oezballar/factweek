@@ -6,6 +6,7 @@ import java.time.LocalDate
 interface TechnologyFacts {
     fun publish(command: PublishTechnologyFact): TechnologyFact
     fun occurredBetween(from: LocalDate, to: LocalDate): List<TechnologyFact>
+    fun relevantForBriefingBetween(from: LocalDate, to: LocalDate): List<BriefingRelevantTechnologyFact>
 }
 
 data class PublishTechnologyFact(
@@ -18,3 +19,19 @@ data class PublishTechnologyFact(
     val entities: List<EntityReference>,
     val sources: List<SourceReference>,
 )
+
+/** A fact together with the non-persisted date that made it relevant to a briefing. */
+data class BriefingRelevantTechnologyFact(
+    val fact: TechnologyFact,
+    val reference: BriefingReference,
+)
+
+data class BriefingReference(
+    val date: LocalDate,
+    val basis: BriefingReferenceBasis,
+)
+
+enum class BriefingReferenceBasis {
+    OCCURRED_ON,
+    SOURCE_PUBLISHED_AT,
+}

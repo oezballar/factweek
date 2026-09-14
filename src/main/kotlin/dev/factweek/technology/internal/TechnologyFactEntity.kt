@@ -2,6 +2,8 @@ package dev.factweek.technology.internal
 
 import dev.factweek.technology.*
 import jakarta.persistence.*
+import org.hibernate.annotations.Fetch
+import org.hibernate.annotations.FetchMode
 import java.time.LocalDate
 import java.util.UUID
 
@@ -16,16 +18,18 @@ internal class TechnologyFactEntity(
     @Enumerated(EnumType.STRING) @Column(name = "evidence_level", nullable = false) val evidenceLevel: EvidenceLevel,
     @Column(name = "occurred_on") val occurredOn: LocalDate?,
     @ElementCollection(fetch = FetchType.EAGER)
+    @Fetch(FetchMode.SUBSELECT)
     @CollectionTable(name = "technology_fact_entity", joinColumns = [JoinColumn(name = "fact_id")])
     val entities: MutableList<EntityValue> = mutableListOf(),
     @ElementCollection(fetch = FetchType.EAGER)
+    @Fetch(FetchMode.SUBSELECT)
     @CollectionTable(name = "technology_fact_source", joinColumns = [JoinColumn(name = "fact_id")])
     val sources: MutableList<SourceValue> = mutableListOf(),
 ) {
     fun toDomain() = TechnologyFact(
         id, statement, category, eventType, readiness, evidenceLevel, occurredOn,
         entities.map { EntityReference(it.name, it.type) },
-        sources.map { SourceReference(it.url, it.publisher, it.sourceType) },
+        sources.map { SourceReference(it.url, it.publisher, it.sourceType, it.publishedAt) },
     )
 }
 
@@ -40,4 +44,5 @@ internal data class SourceValue(
     @Column(name = "source_url", nullable = false, length = 2000) val url: String = "",
     @Column(name = "source_publisher", nullable = false) val publisher: String = "",
     @Enumerated(EnumType.STRING) @Column(name = "source_type", nullable = false) val sourceType: SourceType = SourceType.NEWS_REPORT,
+    @Column(name = "source_published_at") val publishedAt: java.time.Instant? = null,
 )

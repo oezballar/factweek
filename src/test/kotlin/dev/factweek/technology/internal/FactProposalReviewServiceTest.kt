@@ -3,6 +3,7 @@ package dev.factweek.technology.internal
 import dev.factweek.ingestion.CandidateCaptureCommand
 import dev.factweek.ingestion.CandidateDiscoveryProvider
 import dev.factweek.ingestion.CandidateSourceType
+import dev.factweek.ingestion.SourceDocuments
 import dev.factweek.ingestion.internal.CandidatePersistenceService
 import dev.factweek.ingestion.internal.CandidateWriter
 import dev.factweek.ingestion.internal.NewsCandidateRepository
@@ -18,6 +19,7 @@ import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyReadiness
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -57,6 +59,7 @@ class FactProposalReviewServiceTest {
     @Autowired private lateinit var candidatePersistence: CandidatePersistenceService
     @Autowired private lateinit var sourcePersistence: SourceDocumentPersistenceService
     @Autowired private lateinit var documents: SourceDocumentRepository
+    @Autowired private lateinit var sourceDocuments: SourceDocuments
     @Autowired private lateinit var candidates: NewsCandidateRepository
     @Autowired private lateinit var jdbcTemplate: JdbcTemplate
 
@@ -89,6 +92,7 @@ class FactProposalReviewServiceTest {
         assertEquals("https://example.org/review", fact.sources.single().url)
         assertEquals("Example", fact.sources.single().publisher)
         assertEquals(SourceType.PRIMARY_DOCUMENT, fact.sources.single().sourceType)
+        assertEquals(Instant.parse("2026-09-01T00:00:00Z"), fact.sources.single().publishedAt)
     }
 
     @Test
@@ -147,6 +151,26 @@ class FactProposalReviewServiceTest {
         assertEquals(null, fact.occurredOn)
         assertEquals(EvidenceLevel.PRIMARY_CONFIRMED, fact.evidenceLevel)
         assertEquals("https://example.org/review", fact.sources.single().url)
+    }
+
+    @Test
+    fun `accept copies an unknown source publication timestamp as null without changing occurred date`() {
+        val proposal = proposed(path = "unknown-publication", publishedAt = null, occurredOn = LocalDate.of(2026, 9, 1))
+
+        val result = reviews.accept(proposal.id, acceptCommand())
+
+        val fact = technologyFacts.findById(result.technologyFactId).orElseThrow()
+        assertEquals(LocalDate.of(2026, 9, 1), fact.occurredOn)
+        assertNull(fact.sources.single().publishedAt)
+    }
+
+    @Test
+    fun `fetched source document exposes the candidate publication timestamp through the public ingestion port`() {
+        val proposal = proposed(path = "published-source")
+
+        val source = sourceDocuments.findFetchedById(proposal.sourceDocumentId)
+
+        assertEquals(Instant.parse("2026-09-01T00:00:00Z"), source?.publishedAt)
     }
 
     @Test
@@ -226,6 +250,7 @@ class FactProposalReviewServiceTest {
         sourceType: CandidateSourceType = CandidateSourceType.PRIMARY_DOCUMENT,
         suggestedEvidenceLevel: EvidenceLevel = EvidenceLevel.DOCUMENTED,
         occurredOn: LocalDate? = LocalDate.of(2026, 9, 1),
+        publishedAt: Instant? = Instant.parse("2026-09-01T00:00:00Z"),
     ): FactProposalEntity {
         val candidate = candidatePersistence.storeDiscovered(
             CandidateCaptureCommand(
@@ -233,7 +258,7 @@ class FactProposalReviewServiceTest {
                 sourceUrl = URI.create("https://example.org/$path"),
                 publisher = "Example",
                 language = "en",
-                publishedAt = Instant.parse("2026-09-01T00:00:00Z"),
+                publishedAt = publishedAt,
                 discoveryProvider = CandidateDiscoveryProvider.GDELT,
                 sourceType = sourceType,
             ),

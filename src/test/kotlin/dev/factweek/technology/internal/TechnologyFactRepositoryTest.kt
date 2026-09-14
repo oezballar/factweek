@@ -1,10 +1,14 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.technology.EvidenceLevel
+import dev.factweek.technology.BriefingReferenceBasis
 import dev.factweek.technology.TechnologyCategory
 import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyFacts
 import dev.factweek.technology.TechnologyReadiness
+import dev.factweek.technology.PublishTechnologyFact
+import dev.factweek.technology.SourceReference
+import dev.factweek.technology.SourceType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
@@ -22,6 +26,7 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import java.time.LocalDate
+import java.time.Instant
 import java.util.UUID
 
 @SpringBootTest(
@@ -56,7 +61,83 @@ class TechnologyFactRepositoryTest {
         assertNull(repository.findById(undated.id).orElseThrow().occurredOn)
     }
 
-    private fun fact(id: String, occurredOn: LocalDate?) = TechnologyFactEntity(
+    @Test
+    fun `briefing relevance uses occurred date first otherwise the earliest source publication in UTC`() {
+        val occurredInside = fact(
+            "00000000-0000-0000-0000-000000000010",
+            LocalDate.of(2026, 9, 10),
+            sources = listOf(source("2026-09-01T00:00:00Z")),
+        )
+        val occurredOutsideSourceInside = fact(
+            "00000000-0000-0000-0000-000000000011",
+            LocalDate.of(2026, 9, 1),
+            sources = listOf(source("2026-09-10T00:00:00Z")),
+        )
+        val earliestInside = fact(
+            "00000000-0000-0000-0000-000000000012",
+            null,
+            sources = listOf(source("2026-09-07T00:00:00Z"), source("2026-09-13T23:59:59Z")),
+        )
+        val earliestOutside = fact(
+            "00000000-0000-0000-0000-000000000013",
+            null,
+            sources = listOf(source("2026-09-06T23:59:59Z"), source("2026-09-10T00:00:00Z")),
+        )
+        val withoutPublicationTime = fact(
+            "00000000-0000-0000-0000-000000000014",
+            null,
+            sources = listOf(SourceValue("https://example.org/unknown", "Example", dev.factweek.technology.SourceType.PAPER)),
+        )
+        val duplicateCandidates = fact(
+            "00000000-0000-0000-0000-000000000015",
+            null,
+            sources = listOf(source("2026-09-10T00:00:00Z"), source("2026-09-10T12:00:00Z")),
+        )
+        repository.saveAll(listOf(occurredInside, occurredOutsideSourceInside, earliestInside, earliestOutside, withoutPublicationTime, duplicateCandidates))
+
+        val results = technologyFacts.relevantForBriefingBetween(LocalDate.of(2026, 9, 7), LocalDate.of(2026, 9, 13))
+
+        assertEquals(
+            setOf(occurredInside.id, earliestInside.id, duplicateCandidates.id),
+            results.map { it.fact.id }.toSet(),
+        )
+        assertEquals(3, results.size)
+        assertEquals(BriefingReferenceBasis.OCCURRED_ON, results.single { it.fact.id == occurredInside.id }.reference.basis)
+        assertEquals(LocalDate.of(2026, 9, 10), results.single { it.fact.id == occurredInside.id }.reference.date)
+        assertEquals(BriefingReferenceBasis.SOURCE_PUBLISHED_AT, results.single { it.fact.id == earliestInside.id }.reference.basis)
+        assertEquals(LocalDate.of(2026, 9, 7), results.single { it.fact.id == earliestInside.id }.reference.date)
+    }
+
+    @Test
+    fun `direct publishing preserves each optional source publication timestamp`() {
+        val firstPublication = Instant.parse("2026-09-10T00:00:00Z")
+        val fact = technologyFacts.publish(
+            PublishTechnologyFact(
+                statement = "A directly published source-backed fact.",
+                category = TechnologyCategory.AI_AND_SOFTWARE,
+                eventType = TechnologyEventType.TECHNOLOGY_DEPLOYED,
+                readiness = TechnologyReadiness.PRODUCTION_USE,
+                evidenceLevel = EvidenceLevel.PRIMARY_CONFIRMED,
+                occurredOn = null,
+                entities = emptyList(),
+                sources = listOf(
+                    SourceReference("https://example.org/first", "Example", SourceType.PAPER, firstPublication),
+                    SourceReference("https://example.org/unknown", "Example", SourceType.REPOSITORY),
+                ),
+            ),
+        )
+
+        val stored = repository.findById(fact.id).orElseThrow().toDomain()
+
+        assertEquals(firstPublication, stored.sources.single { it.url.endsWith("/first") }.publishedAt)
+        assertNull(stored.sources.single { it.url.endsWith("/unknown") }.publishedAt)
+    }
+
+    private fun fact(
+        id: String,
+        occurredOn: LocalDate?,
+        sources: List<SourceValue> = emptyList(),
+    ) = TechnologyFactEntity(
         id = UUID.fromString(id),
         statement = "A persisted technology fact.",
         category = TechnologyCategory.AI_AND_SOFTWARE,
@@ -64,6 +145,14 @@ class TechnologyFactRepositoryTest {
         readiness = TechnologyReadiness.PRODUCTION_USE,
         evidenceLevel = EvidenceLevel.PRIMARY_CONFIRMED,
         occurredOn = occurredOn,
+        sources = sources.toMutableList(),
+    )
+
+    private fun source(publishedAt: String) = SourceValue(
+        url = "https://example.org/${publishedAt.hashCode()}",
+        publisher = "Example",
+        sourceType = dev.factweek.technology.SourceType.PAPER,
+        publishedAt = Instant.parse(publishedAt),
     )
 
     @SpringBootConfiguration

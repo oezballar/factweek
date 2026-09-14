@@ -4,6 +4,7 @@ import dev.factweek.technology.*
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 @Service
 @Transactional
@@ -22,7 +23,7 @@ internal class TechnologyFactService(
                 evidenceLevel = command.evidenceLevel,
                 occurredOn = command.occurredOn,
                 entities = command.entities.map { EntityValue(it.name, it.type) }.toMutableList(),
-                sources = command.sources.map { SourceValue(it.url, it.publisher, it.sourceType) }.toMutableList(),
+                sources = command.sources.map { SourceValue(it.url, it.publisher, it.sourceType, it.publishedAt) }.toMutableList(),
             ),
         ).toDomain()
     }
@@ -30,6 +31,24 @@ internal class TechnologyFactService(
     @Transactional(readOnly = true)
     override fun occurredBetween(from: LocalDate, to: LocalDate): List<TechnologyFact> =
         repository.findAllByOccurredOnBetweenOrderByOccurredOnDescIdAsc(from, to).map { it.toDomain() }
+
+    @Transactional(readOnly = true)
+    override fun relevantForBriefingBetween(from: LocalDate, to: LocalDate): List<BriefingRelevantTechnologyFact> {
+        val sourceFrom = from.atStartOfDay(ZoneOffset.UTC).toInstant()
+        val sourceToExclusive = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant()
+        return repository.findAllRelevantForBriefing(from, to, sourceFrom, sourceToExclusive)
+            .mapNotNull(::toBriefingRelevantFact)
+            .filter { it.reference.date in from..to }
+    }
+
+    private fun toBriefingRelevantFact(entity: TechnologyFactEntity): BriefingRelevantTechnologyFact? {
+        val reference = entity.occurredOn?.let { BriefingReference(it, BriefingReferenceBasis.OCCURRED_ON) }
+            ?: entity.sources.mapNotNull { it.publishedAt }.minOrNull()?.let { publishedAt ->
+                BriefingReference(publishedAt.atZone(ZoneOffset.UTC).toLocalDate(), BriefingReferenceBasis.SOURCE_PUBLISHED_AT)
+            }
+            ?: return null
+        return BriefingRelevantTechnologyFact(entity.toDomain(), reference)
+    }
 }
 
 internal object TechnologyFactPolicy {

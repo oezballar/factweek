@@ -37,6 +37,7 @@ internal class FactProposalReviewService(
                         sourceDocument.sourceUrl,
                         sourceDocument.publisher,
                         sourceDocument.sourceType.toTechnologySourceType(),
+                        sourceDocument.publishedAt,
                     ),
                 ),
             ),
