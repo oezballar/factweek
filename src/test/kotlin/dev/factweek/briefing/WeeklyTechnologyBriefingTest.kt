@@ -3,6 +3,9 @@ package dev.factweek.briefing
 import dev.factweek.technology.EntityReference
 import dev.factweek.technology.EntityType
 import dev.factweek.technology.EvidenceLevel
+import dev.factweek.technology.BriefingReference
+import dev.factweek.technology.BriefingReferenceBasis
+import dev.factweek.technology.BriefingRelevantTechnologyFact
 import dev.factweek.technology.PublishTechnologyFact
 import dev.factweek.technology.SourceReference
 import dev.factweek.technology.SourceType
@@ -35,7 +38,8 @@ class WeeklyTechnologyBriefingTest {
         assertEquals(LocalDate.of(2026, 9, 7), result.from)
         assertEquals(LocalDate.of(2026, 9, 13), result.to)
         assertEquals(Instant.parse("2026-09-13T12:00:00Z"), result.generatedAt)
-        assertEquals(listOf(upperBoundary, lowerBoundary), result.facts)
+        assertEquals(listOf(upperBoundary, lowerBoundary), result.facts.map { it.toTechnologyFact() })
+        assertEquals(BriefingReferenceBasis.OCCURRED_ON, result.facts.first().referenceDateBasis)
         assertEquals(2, result.factCount)
         assertEquals(TechnologyCategory.entries.sortedBy { it.name }, result.appliedCategories)
     }
@@ -57,7 +61,7 @@ class WeeklyTechnologyBriefingTest {
             listOf(TechnologyCategory.AI_AND_SOFTWARE, TechnologyCategory.ENERGY_AND_CLIMATE),
             result.appliedCategories,
         )
-        assertEquals(listOf(first, second), result.facts)
+        assertEquals(listOf(first, second), result.facts.map { it.toTechnologyFact() })
         assertEquals(2, result.factCount)
         assertEquals(2, result.requestedMaximum)
     }
@@ -67,7 +71,7 @@ class WeeklyTechnologyBriefingTest {
         val result = WeeklyTechnologyBriefing(RecordingTechnologyFacts(emptyList()), clock)
             .current(setOf(TechnologyCategory.MEDICINE_AND_BIOTECH), 4)
 
-        assertEquals(emptyList<TechnologyFact>(), result.facts)
+        assertEquals(emptyList<BriefingTechnologyFact>(), result.facts)
         assertEquals(0, result.factCount)
         assertEquals(4, result.requestedMaximum)
         assertEquals(listOf(TechnologyCategory.MEDICINE_AND_BIOTECH), result.appliedCategories)
@@ -90,10 +94,34 @@ class WeeklyTechnologyBriefingTest {
 
         val result = WeeklyTechnologyBriefing(RecordingTechnologyFacts(listOf(undated, dated)), clock).current(emptySet(), 10)
 
-        assertEquals(listOf(dated), result.facts)
+        assertEquals(listOf(dated), result.facts.map { it.toTechnologyFact() })
     }
 
-    private fun fact(id: String, occurredOn: LocalDate?, category: TechnologyCategory = TechnologyCategory.AI_AND_SOFTWARE) =
+    @Test
+    fun `undated facts use the earliest source publication as their briefing reference`() {
+        val sourcePublishedFact = fact(
+            "00000000-0000-0000-0000-000000000008",
+            null,
+            sources = listOf(
+                SourceReference("https://example.org/later", "Example", SourceType.PAPER, Instant.parse("2026-09-11T00:00:00Z")),
+                SourceReference("https://example.org/earlier", "Example", SourceType.PAPER, Instant.parse("2026-09-08T23:59:59Z")),
+            ),
+        )
+        val fullyUndated = fact("00000000-0000-0000-0000-000000000009", null)
+
+        val result = WeeklyTechnologyBriefing(RecordingTechnologyFacts(listOf(fullyUndated, sourcePublishedFact)), clock).current(emptySet(), 10)
+
+        assertEquals(listOf(sourcePublishedFact), result.facts.map { it.toTechnologyFact() })
+        assertEquals(LocalDate.of(2026, 9, 8), result.facts.single().referenceDate)
+        assertEquals(BriefingReferenceBasis.SOURCE_PUBLISHED_AT, result.facts.single().referenceDateBasis)
+    }
+
+    private fun fact(
+        id: String,
+        occurredOn: LocalDate?,
+        category: TechnologyCategory = TechnologyCategory.AI_AND_SOFTWARE,
+        sources: List<SourceReference> = listOf(SourceReference("https://example.org/source", "Example", SourceType.NEWS_REPORT)),
+    ) =
         TechnologyFact(
             id = UUID.fromString(id),
             statement = "A concrete technology fact.",
@@ -103,7 +131,7 @@ class WeeklyTechnologyBriefingTest {
             evidenceLevel = EvidenceLevel.PRIMARY_CONFIRMED,
             occurredOn = occurredOn,
             entities = listOf(EntityReference("Example technology", EntityType.TECHNOLOGY)),
-            sources = listOf(SourceReference("https://example.org/source", "Example", SourceType.NEWS_REPORT)),
+            sources = sources,
         )
 
     private class RecordingTechnologyFacts(
@@ -119,5 +147,30 @@ class WeeklyTechnologyBriefingTest {
             this.to = to
             return facts
         }
+
+        override fun relevantForBriefingBetween(from: LocalDate, to: LocalDate): List<BriefingRelevantTechnologyFact> {
+            this.from = from
+            this.to = to
+            return facts.mapNotNull { fact ->
+                val reference = fact.occurredOn?.let {
+                    BriefingReference(it, BriefingReferenceBasis.OCCURRED_ON)
+                } ?: fact.sources.mapNotNull { it.publishedAt }.minOrNull()?.let {
+                    BriefingReference(it.atZone(ZoneOffset.UTC).toLocalDate(), BriefingReferenceBasis.SOURCE_PUBLISHED_AT)
+                } ?: return@mapNotNull null
+                BriefingRelevantTechnologyFact(fact, reference)
+            }
+        }
     }
+
+    private fun BriefingTechnologyFact.toTechnologyFact() = TechnologyFact(
+        id,
+        statement,
+        category,
+        eventType,
+        readiness,
+        evidenceLevel,
+        occurredOn,
+        entities,
+        sources,
+    )
 }

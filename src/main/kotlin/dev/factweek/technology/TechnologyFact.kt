@@ -1,5 +1,6 @@
 package dev.factweek.technology
 
+import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
@@ -24,6 +25,8 @@ data class SourceReference(
     val url: String,
     val publisher: String,
     val sourceType: SourceType,
+    /** Publication timestamp of this concrete source, not the asserted event date. */
+    val publishedAt: Instant? = null,
 )
 
 enum class TechnologyCategory {

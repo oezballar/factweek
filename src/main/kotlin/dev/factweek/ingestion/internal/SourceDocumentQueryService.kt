@@ -41,5 +41,6 @@ internal class SourceDocumentQueryService(
         fetchedAt = requireNotNull(document.fetchedAt),
         publisher = document.candidate.publisher,
         sourceType = document.candidate.sourceType,
+        publishedAt = document.candidate.publishedAt,
     )
 }

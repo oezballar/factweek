@@ -1,6 +1,15 @@
 package dev.factweek.briefing
 
 import dev.factweek.technology.TechnologyCategory
+import dev.factweek.technology.TechnologyFact
+import dev.factweek.technology.TechnologyEventType
+import dev.factweek.technology.TechnologyReadiness
+import dev.factweek.technology.EvidenceLevel
+import dev.factweek.technology.EntityReference
+import dev.factweek.technology.EntityType
+import dev.factweek.technology.SourceReference
+import dev.factweek.technology.SourceType
+import dev.factweek.technology.BriefingReferenceBasis
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -15,6 +24,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.time.Instant
 import java.time.LocalDate
+import java.util.UUID
 
 class WeeklyTechnologyBriefingControllerTest {
     private lateinit var briefing: WeeklyTechnologyBriefing
@@ -74,16 +84,67 @@ class WeeklyTechnologyBriefingControllerTest {
             .andExpect(jsonPath("$.detail").value("Invalid technology briefing request"))
     }
 
+    @Test
+    fun `renders a source publication briefing reference while preserving flat fact fields`() {
+        val fact = TechnologyFact(
+            UUID.randomUUID(), "A fact without an event date.", TechnologyCategory.AI_AND_SOFTWARE,
+            TechnologyEventType.TECHNOLOGY_DEPLOYED, TechnologyReadiness.PRODUCTION_USE,
+            EvidenceLevel.PRIMARY_CONFIRMED, null,
+            listOf(EntityReference("Example", EntityType.TECHNOLOGY)),
+            listOf(SourceReference("https://example.org/source", "Example", SourceType.PAPER, Instant.parse("2026-09-09T00:00:00Z"))),
+        )
+        val response = response(
+            requestedMaximum = 10,
+            facts = listOf(BriefingTechnologyFact.from(fact, LocalDate.of(2026, 9, 9), BriefingReferenceBasis.SOURCE_PUBLISHED_AT)),
+        )
+        `when`(briefing.current(emptySet(), 10)).thenReturn(response)
+
+        mockMvc.perform(get("/api/v1/briefings/technology/current"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.factCount").value(1))
+            .andExpect(jsonPath("$.facts[0].statement").value("A fact without an event date."))
+            .andExpect(jsonPath("$.facts[0].sources[0].url").value("https://example.org/source"))
+            .andExpect(jsonPath("$.facts[0].referenceDate").value("2026-09-09"))
+            .andExpect(jsonPath("$.facts[0].referenceDateBasis").value("SOURCE_PUBLISHED_AT"))
+            .andExpect(jsonPath("$.facts[0].occurredOn").doesNotExist())
+    }
+
+    @Test
+    fun `renders an occurred event date briefing reference while preserving flat fact fields`() {
+        val fact = TechnologyFact(
+            UUID.randomUUID(), "A fact with an event date.", TechnologyCategory.AI_AND_SOFTWARE,
+            TechnologyEventType.TECHNOLOGY_DEPLOYED, TechnologyReadiness.PRODUCTION_USE,
+            EvidenceLevel.PRIMARY_CONFIRMED, LocalDate.of(2026, 9, 10),
+            listOf(EntityReference("Example", EntityType.TECHNOLOGY)),
+            listOf(SourceReference("https://example.org/source", "Example", SourceType.PAPER)),
+        )
+        val response = response(
+            requestedMaximum = 10,
+            facts = listOf(BriefingTechnologyFact.from(fact, LocalDate.of(2026, 9, 10), BriefingReferenceBasis.OCCURRED_ON)),
+        )
+        `when`(briefing.current(emptySet(), 10)).thenReturn(response)
+
+        mockMvc.perform(get("/api/v1/briefings/technology/current"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.factCount").value(1))
+            .andExpect(jsonPath("$.facts[0].statement").value("A fact with an event date."))
+            .andExpect(jsonPath("$.facts[0].sources[0].url").value("https://example.org/source"))
+            .andExpect(jsonPath("$.facts[0].occurredOn").value("2026-09-10"))
+            .andExpect(jsonPath("$.facts[0].referenceDate").value("2026-09-10"))
+            .andExpect(jsonPath("$.facts[0].referenceDateBasis").value("OCCURRED_ON"))
+    }
+
     private fun response(
         categories: List<TechnologyCategory> = TechnologyCategory.entries.sortedBy { it.name },
         requestedMaximum: Int,
+        facts: List<BriefingTechnologyFact> = emptyList(),
     ) = CurrentTechnologyBriefing(
         from = LocalDate.of(2026, 9, 7),
         to = LocalDate.of(2026, 9, 13),
         generatedAt = Instant.parse("2026-09-13T12:00:00Z"),
         appliedCategories = categories,
         requestedMaximum = requestedMaximum,
-        factCount = 0,
-        facts = emptyList(),
+        factCount = facts.size,
+        facts = facts,
     )
 }

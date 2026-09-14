@@ -2,6 +2,7 @@ package dev.factweek.ingestion.internal
 
 import dev.factweek.ingestion.GdeltCandidate
 import dev.factweek.ingestion.GdeltCandidates
+import dev.factweek.ingestion.CandidateSourceType
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -63,6 +64,8 @@ class GdeltImportServiceTest {
         assertEquals(0, second.storedCount)
         assertEquals(2, second.existingCount)
         assertEquals(2, repository.count())
+        assertEquals(null, repository.findAll().single { it.canonicalUrl.endsWith("/one") }.publishedAt)
+        assertEquals(CandidateSourceType.NEWS_REPORT, repository.findAll().single { it.canonicalUrl.endsWith("/one") }.sourceType)
     }
 
     @Test
