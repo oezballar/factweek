@@ -10,22 +10,6 @@ import dev.factweek.technology.TechnologyReadiness
 import java.time.Instant
 import java.time.LocalDate
 
-data class BriefingReference(
-    val date: LocalDate,
-    val basis: BriefingReferenceBasis,
-)
-
-enum class BriefingReferenceBasis {
-    OCCURRED_ON,
-    SOURCE_PUBLISHED_AT,
-}
-
-data class BriefingWindow(
-    val from: LocalDate,
-    val to: LocalDate,
-    val generatedAt: Instant,
-)
-
 /** A factual, non-narrative view of reviewed technology facts for the current rolling window. */
 data class CurrentTechnologyBriefing(
     val from: LocalDate,
