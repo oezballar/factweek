@@ -12,6 +12,9 @@ internal class SourceDocumentQueryService(
     private val repository: SourceDocumentRepository,
 ) : SourceDocuments {
     @Transactional(readOnly = true)
+    override fun existsById(id: UUID): Boolean = repository.existsById(id)
+
+    @Transactional(readOnly = true)
     override fun findFetchedForFactProposals(
         maximum: Int,
         excludedSourceDocumentIds: Set<UUID>,

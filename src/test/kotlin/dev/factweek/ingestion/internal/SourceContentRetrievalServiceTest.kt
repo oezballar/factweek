@@ -37,6 +37,7 @@ class SourceContentRetrievalServiceTest {
     @Autowired private lateinit var documents: SourceDocumentRepository
     @Autowired private lateinit var candidateRepository: NewsCandidateRepository
     @Autowired private lateinit var fetcher: StubFetcher
+    @Autowired private lateinit var persistence: SourceDocumentPersistenceService
 
     @BeforeEach
     fun clean() {
@@ -62,6 +63,31 @@ class SourceContentRetrievalServiceTest {
         assertEquals(1, stored.attemptCount)
         assertEquals(0, second.selectedCount)
         assertEquals(1, fetcher.calls.size)
+    }
+
+    @Test
+    fun `does not replace an already fetched document through the regular success path`() {
+        val captured = candidates.storeDiscovered(candidate("immutable"))
+        val entity = candidateRepository.findById(captured.id).orElseThrow()
+        val first = SourceContentFetchResult(
+            URI.create("https://example.org/immutable"), "text/html", 200,
+            "Original normalized content.", "a".repeat(64),
+        )
+        val replacement = SourceContentFetchResult(
+            URI.create("https://example.org/immutable-new"), "text/html", 200,
+            "Replacement normalized content.", "b".repeat(64),
+        )
+
+        persistence.recordSuccess(entity, first)
+        val original = documents.findById(captured.id).orElseThrow()
+        persistence.recordSuccess(entity, replacement)
+        val stored = documents.findById(captured.id).orElseThrow()
+
+        assertEquals(SourceDocumentStatus.FETCHED, stored.status)
+        assertEquals("Original normalized content.", stored.textContent)
+        assertEquals("a".repeat(64), stored.contentSha256)
+        assertEquals(original.fetchedAt, stored.fetchedAt)
+        assertEquals(1, documents.count())
     }
 
     @Test

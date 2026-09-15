@@ -3,8 +3,14 @@ package dev.factweek.ingestion
 import java.time.Instant
 import java.util.UUID
 
-/** Public read API for successfully retrieved source content. */
+/**
+ * Public read API for successfully retrieved source content.
+ * A document that reached FETCHED is immutable through regular application write paths.
+ */
 interface SourceDocuments {
+    /** Returns whether a candidate with this source-document identity exists, regardless of fetch status. */
+    fun existsById(id: UUID): Boolean
+
     /**
      * Returns at most [maximum] fetched documents whose ids are not in [excludedSourceDocumentIds].
      * Exclusion is applied by the database before the limit.
