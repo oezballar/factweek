@@ -12,7 +12,6 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.support.StaticListableBeanFactory
-import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -48,6 +47,16 @@ class DocumentClassificationServiceTest {
             listOf(SectionId("technology"), SectionId("economy"), SectionId("technology")),
         )
         `when`(repository.saveAndFlush(org.mockito.ArgumentMatchers.any())).thenAnswer { invocation -> invocation.arguments[0] }
+        `when`(repository.findBySourceDocumentIdAndClassificationVersion(documentId, "article-section-classification-v1"))
+            .thenReturn(
+                null,
+                DocumentSectionClassificationEntity(
+                    documentId,
+                    "article-section-classification-v1",
+                    Instant.parse("2026-09-15T10:00:00Z"),
+                    linkedSetOf("economy", "technology"),
+                ),
+            )
 
         val result = service(repository, classifier).classify(documentId)
 
@@ -68,33 +77,78 @@ class DocumentClassificationServiceTest {
         verify(repository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any())
     }
 
+    @Test
+    fun `rejects an unsupported section returned by a classifier before writing`() {
+        val repository = mock(DocumentSectionClassificationRepository::class.java)
+        val classifier = mock(ArticleSectionClassifier::class.java)
+        `when`(classifier.classify(anyRequest())).thenReturn(listOf(SectionId("politics")))
+        val writer = mock(DocumentClassificationWriter::class.java)
+
+        assertThrows(ArticleSectionClassificationException::class.java) {
+            service(repository, classifier, writer).classify(UUID.randomUUID())
+        }
+
+        verify(writer, never()).insert(anyEntity())
+    }
+
+    @Test
+    fun `reuses an existing classification when no classifier is available`() {
+        val repository = mock(DocumentSectionClassificationRepository::class.java)
+        val documentId = UUID.randomUUID()
+        val existing = DocumentSectionClassificationEntity(
+            documentId,
+            "article-section-classification-v1",
+            Instant.parse("2026-09-15T10:00:00Z"),
+            linkedSetOf(),
+        )
+        `when`(repository.findBySourceDocumentIdAndClassificationVersion(documentId, "article-section-classification-v1"))
+            .thenReturn(existing)
+
+        val result = serviceWithoutClassifier(repository).classify(documentId)
+
+        assertEquals(existing.toDomain(), result)
+    }
+
+    @Test
+    fun `reports unavailable classifier only for a document without a stored result`() {
+        val repository = mock(DocumentSectionClassificationRepository::class.java)
+        val documentId = UUID.randomUUID()
+        `when`(repository.findBySourceDocumentIdAndClassificationVersion(documentId, "article-section-classification-v1"))
+            .thenReturn(null)
+
+        assertThrows(ArticleSectionClassifierUnavailableException::class.java) {
+            serviceWithoutClassifier(repository).classify(documentId)
+        }
+    }
+
     private fun service(
         repository: DocumentSectionClassificationRepository,
         classifier: ArticleSectionClassifier,
+        writer: DocumentClassificationWriter = mock(DocumentClassificationWriter::class.java),
     ): DocumentClassificationService {
         val sourceDocuments = FakeSourceDocuments()
         val beanFactory = StaticListableBeanFactory()
         beanFactory.addBean("classifier", classifier)
         val provider = beanFactory.getBeanProvider(ArticleSectionClassifier::class.java)
-        val transactionTemplate = TransactionTemplate(
-            object : org.springframework.transaction.PlatformTransactionManager {
-                override fun getTransaction(definition: org.springframework.transaction.TransactionDefinition?) =
-                    org.springframework.transaction.support.SimpleTransactionStatus()
-
-                override fun commit(status: org.springframework.transaction.TransactionStatus) = Unit
-
-                override fun rollback(status: org.springframework.transaction.TransactionStatus) = Unit
-            },
-        )
         return DocumentClassificationService(
             sourceDocuments,
             provider,
-            ArticleSectionClassificationSettings("gpt-5-mini", "article-section-classification-v1", "Technology", "Economy"),
+            settings(),
             repository,
-            transactionTemplate,
+            writer,
             Clock.fixed(Instant.parse("2026-09-15T10:00:00Z"), ZoneOffset.UTC),
         )
     }
+
+    private fun serviceWithoutClassifier(repository: DocumentSectionClassificationRepository): DocumentClassificationService =
+        DocumentClassificationService(
+            FakeSourceDocuments(),
+            StaticListableBeanFactory().getBeanProvider(ArticleSectionClassifier::class.java),
+            settings(),
+            repository,
+            mock(DocumentClassificationWriter::class.java),
+            Clock.fixed(Instant.parse("2026-09-15T10:00:00Z"), ZoneOffset.UTC),
+        )
 
     private fun anyRequest(): ArticleSectionClassificationRequest =
         org.mockito.ArgumentMatchers.any(ArticleSectionClassificationRequest::class.java)
@@ -104,6 +158,28 @@ class DocumentClassificationServiceTest {
                 textContent = "",
                 supportedSections = emptyList(),
             )
+
+    private fun anyEntity(): DocumentSectionClassificationEntity =
+        org.mockito.ArgumentMatchers.any(DocumentSectionClassificationEntity::class.java)
+            ?: DocumentSectionClassificationEntity(
+                UUID.randomUUID(),
+                "test",
+                Instant.EPOCH,
+            )
+
+    private fun settings(): ArticleSectionClassificationSettings = ArticleSectionClassificationSettings(
+        version = "article-section-classification-v1",
+        sections = listOf(
+            ArticleSectionClassificationSettings.SectionProperties().apply {
+                id = "technology"
+                description = "Technology"
+            },
+            ArticleSectionClassificationSettings.SectionProperties().apply {
+                id = "economy"
+                description = "Economy"
+            },
+        ),
+    ).also { it.validate() }
 
     private class FakeSourceDocuments : SourceDocuments {
         override fun existsById(id: UUID): Boolean = true

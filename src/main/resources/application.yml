@@ -45,9 +45,9 @@ factweek:
   article-classification:
     version: ${ARTICLE_CLASSIFICATION_VERSION:article-section-classification-v1}
     sections:
-      technology:
+      - id: technology
         description: ${ARTICLE_CLASSIFICATION_TECHNOLOGY_DESCRIPTION:Concrete technological developments, research, and technical applications.}
-      economy:
+      - id: economy
         description: ${ARTICLE_CLASSIFICATION_ECONOMY_DESCRIPTION:Concrete economic events and published economic indicators.}
     openai:
       enabled: ${FACTWEEK_ARTICLE_CLASSIFICATION_OPENAI_ENABLED:false}

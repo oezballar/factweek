@@ -23,3 +23,5 @@ internal class ArticleSectionClassificationException : RuntimeException {
     constructor(message: String) : super(message)
     constructor(message: String, cause: Throwable) : super(message, cause)
 }
+
+internal class ArticleSectionClassifierUnavailableException : RuntimeException()

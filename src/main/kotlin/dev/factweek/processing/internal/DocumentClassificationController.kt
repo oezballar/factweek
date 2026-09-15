@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.beans.TypeMismatchException
 import java.util.UUID
 
 @RestController
@@ -31,6 +32,14 @@ internal class DocumentClassificationController(
     @ExceptionHandler(ArticleSectionClassificationException::class)
     fun classificationFailure(): ProblemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, "Article classification failed")
+
+    @ExceptionHandler(ArticleSectionClassifierUnavailableException::class)
+    fun classifierUnavailable(): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "Article section classifier is not available")
+
+    @ExceptionHandler(TypeMismatchException::class)
+    fun invalidPath(): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "A valid document id is required")
 }
 
 internal class DocumentClassificationNotFoundException : RuntimeException()

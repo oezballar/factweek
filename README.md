@@ -19,7 +19,8 @@ The repository is deliberately built as a Spring Modulith modular monolith: one 
 
 | Module | Responsibility |
 | --- | --- |
-| `ingestion` | Discover unverified technology candidates from sources such as GDELT |
+| `ingestion` | Shared source capture, document retrieval, and access to fetched documents |
+| `processing` | Persisted section classification of fetched source documents; it knows no Technology or Economy fact models |
 | `provenance` | Own shared source references and source types |
 | `technology` | Own the reviewed technology-fact domain and publication rules |
 | `economy` | Own directly published, evidenced economy facts and their structured measurements |
@@ -285,14 +286,45 @@ curl -X POST 'http://localhost:8080/api/v1/economy/facts' \
 
 ## Article section classification
 
-Ingestion remains shared and provider-neutral. A successfully fetched source document can be classified manually for `technology`, `economy`, both, or neither; classification is stored separately from extraction and review and does not create facts.
+Ingestion remains shared and provider-neutral; there is no separate Economy ingestion. A successfully fetched source document can be classified manually for `technology`, `economy`, both, or neither. Classification is stored separately from extraction and review and does not create facts.
+
+The configured catalogue defines classification targets, not available extractors. Add a target only by configuration; a later processor for that target remains a separate change:
+
+```yaml
+factweek:
+  article-classification:
+    version: article-section-classification-v1
+    sections:
+      - id: technology
+        description: Concrete technological developments, research, and technical applications.
+      - id: economy
+        description: Concrete economic events and published economic indicators.
+    openai:
+      enabled: true
+      model: gpt-5-mini
+```
+
+To activate the OpenAI classifier, set `FACTWEEK_ARTICLE_CLASSIFICATION_OPENAI_ENABLED=true`, provide `OPENAI_API_KEY` through the environment, and use `SPRING_AI_MODEL_CHAT=openai`. `ARTICLE_CLASSIFICATION_OPENAI_MODEL` optionally overrides `OPENAI_MODEL`. Never place an API key in YAML. Increase `ARTICLE_CLASSIFICATION_VERSION` deliberately when the classification prompt or catalogue changes; there is no automatic historical reclassification.
 
 ```bash
 curl -X POST 'http://localhost:8080/api/v1/processing/documents/<document-id>/classification'
 curl 'http://localhost:8080/api/v1/processing/documents/<document-id>/classification'
 ```
 
-Set `FACTWEEK_ARTICLE_CLASSIFICATION_OPENAI_ENABLED=true` to enable the OpenAI classifier. `ARTICLE_CLASSIFICATION_VERSION` identifies the prompt and configured section catalogue; increase it deliberately when either changes. A successful result, including an empty section list, is reused for the same document and version without another model call. Classification only selects future processing candidates; it does not start extraction or publish anything.
+The response contains only the document identity, version, classification time, and section keys:
+
+```json
+{
+  "documentId": "11111111-1111-1111-1111-111111111111",
+  "classificationVersion": "article-section-classification-v1",
+  "classifiedAt": "2026-09-15T10:00:00Z",
+  "sections": ["economy", "technology"]
+}
+```
+
+Zero, one, or multiple sections are valid; zero is represented as `[]`. Successful results, including empty ones, are reused for the same document and version without another model call. Two parallel first calls may both call the model, but the database stores one immutable result and both callers receive it. The identity is document ID plus classification version because regular ingestion paths never replace a successfully fetched document's content. Stored results remain readable and reusable when the classifier is disabled. Classification only selects future processing candidates; it neither starts extraction nor publishes a fact.
+
+Invalid document IDs return `400`; an unknown document or absent current-version result returns `404`; a known document that is not fetched returns `409`. Model and invalid structured-output failures return `502`; an enabled classification request without an available classifier returns `503`. All use `application/problem+json`.
 
 ## Planned tooling
 
@@ -303,4 +335,4 @@ Set `FACTWEEK_ARTICLE_CLASSIFICATION_OPENAI_ENABLED=true` to enable the OpenAI c
 
 ## Next slice
 
-Implement controlled economy source ingestion and the proposal/review pipeline.
+Connect the existing Technology processing to stored section classifications. Economy proposals and review follow separately.

@@ -4,9 +4,7 @@ import dev.factweek.ingestion.SourceDocuments
 import dev.factweek.processing.DocumentClassification
 import dev.factweek.processing.DocumentClassifications
 import org.springframework.beans.factory.ObjectProvider
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
-import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
 import java.util.UUID
 
@@ -16,7 +14,7 @@ internal class DocumentClassificationService(
     private val classifierProvider: ObjectProvider<ArticleSectionClassifier>,
     private val settings: ArticleSectionClassificationSettings,
     private val repository: DocumentSectionClassificationRepository,
-    private val transactionTemplate: TransactionTemplate,
+    private val writer: DocumentClassificationWriter,
     private val clock: Clock,
 ) : DocumentClassifications {
     override fun classify(documentId: UUID): DocumentClassification {
@@ -25,28 +23,37 @@ internal class DocumentClassificationService(
         val document = sourceDocuments.findFetchedById(documentId)
             ?: throw documentUnavailable(documentId)
         val classifier = classifierProvider.ifAvailable
-            ?: throw ArticleSectionClassificationException("No article section classifier is configured")
+            ?: throw ArticleSectionClassifierUnavailableException()
         val sections = classifier.classify(
             ArticleSectionClassificationRequest(
                 documentId = document.id,
                 sourceUrl = document.sourceUrl,
                 textContent = document.textContent,
-                supportedSections = settings.sections,
+                supportedSections = settings.configuredSections,
             ),
         )
 
+        val normalizedSections = sections.map { section ->
+            try {
+                section.also {
+                    require(settings.configuredSections.any { configured -> configured.id == it })
+                }
+            } catch (exception: IllegalArgumentException) {
+                throw ArticleSectionClassificationException("The classifier returned an unsupported section key", exception)
+            }
+        }.toSet()
+        val entity = DocumentSectionClassificationEntity(
+            sourceDocumentId = document.id,
+            classificationVersion = settings.version,
+            classifiedAt = clock.instant(),
+            sections = normalizedSections.map { it.value }.toCollection(linkedSetOf()),
+        )
         try {
-            return requireNotNull(transactionTemplate.execute {
-                repository.saveAndFlush(
-                    DocumentSectionClassificationEntity(
-                        sourceDocumentId = document.id,
-                        classificationVersion = settings.version,
-                        classifiedAt = clock.instant(),
-                        sections = sections.map { it.value }.toCollection(linkedSetOf()),
-                    ),
-                ).toDomain()
-            })
-        } catch (_: DataIntegrityViolationException) {
+            writer.insert(entity)
+            return find(documentId)
+                ?: throw ArticleSectionClassificationException("Persisted classification could not be read")
+        } catch (exception: RuntimeException) {
+            if (!isDuplicateClassificationIdentity(exception)) throw exception
             return find(documentId)
                 ?: throw ArticleSectionClassificationException("Concurrent classification could not be read")
         }
@@ -61,6 +68,14 @@ internal class DocumentClassificationService(
         } else {
             SourceDocumentNotFoundException()
         }
+
+    private fun isDuplicateClassificationIdentity(exception: RuntimeException): Boolean =
+        generateSequence<Throwable>(exception) { it.cause }
+            .filterIsInstance<org.hibernate.exception.ConstraintViolationException>()
+            .any { constraintViolation ->
+                constraintViolation.sqlState == "23505" &&
+                    constraintViolation.constraintName == "document_section_classification_pk"
+            }
 }
 
 internal class SourceDocumentNotFoundException : RuntimeException()
