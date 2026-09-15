@@ -30,7 +30,7 @@ CREATE TABLE economy_fact_source (
 
 CREATE TABLE economy_fact_measurement (
     fact_id UUID PRIMARY KEY REFERENCES economy_fact(id) ON DELETE CASCADE,
-    measurement_value NUMERIC(30, 10) NOT NULL,
+    measurement_value NUMERIC NOT NULL,
     measurement_unit VARCHAR(32) NOT NULL,
     release_status VARCHAR(32),
     seasonal_adjustment VARCHAR(32),
@@ -41,5 +41,9 @@ CREATE TABLE economy_fact_measurement (
     CONSTRAINT economy_fact_measurement_period_ck CHECK (reference_period_from <= reference_period_to),
     CONSTRAINT economy_fact_measurement_count_ck CHECK (
         measurement_unit <> 'COUNT' OR measurement_value = trunc(measurement_value)
+    ),
+    CONSTRAINT economy_fact_measurement_precision_ck CHECK (
+        abs(measurement_value) < 100000000000000000000::NUMERIC
+        AND min_scale(measurement_value) <= 10
     )
 );

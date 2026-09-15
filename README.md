@@ -1,6 +1,6 @@
 # Factweek
 
-Factweek is a narrative-free, personalized weekly briefing of relevant and evidenced technology changes.
+Factweek is a narrative-free, personalized weekly briefing of relevant and evidenced facts.
 
 The repository is deliberately built as a Spring Modulith modular monolith: one deployable application with explicit, automatically verified domain boundaries.
 
@@ -20,6 +20,7 @@ The repository is deliberately built as a Spring Modulith modular monolith: one 
 | Module | Responsibility |
 | --- | --- |
 | `ingestion` | Discover unverified technology candidates from sources such as GDELT |
+| `provenance` | Own shared source references and source types |
 | `technology` | Own the reviewed technology-fact domain and publication rules |
 | `economy` | Own directly published, evidenced economy facts and their structured measurements |
 | `briefing` | Select the current weekly briefing and apply explicit category filters |
@@ -206,7 +207,9 @@ curl -X POST 'http://localhost:8080/api/v1/technology/facts' \
 
 Economy facts are factual records, not narratives or forecasts. `occurredOn` is only the date of an actual economic event. A periodic `referencePeriod` identifies the period measured, while `sources[].publishedAt` identifies the publication time of a concrete source; none of these values substitutes for another.
 
-The initial measurement units are `PERCENT`, `PERCENTAGE_POINTS`, and `COUNT`. A periodic indicator requires both a measurement and a complete month, quarter, or year reference period. Other currently supported economy event types do not accept measurements.
+The initial measurement units are `PERCENT`, `PERCENTAGE_POINTS`, and `COUNT`. A periodic indicator requires both a measurement and a complete month, quarter, or year reference period. Other currently supported economy event types do not accept measurements. Values support at most 20 required integer digits and 10 required decimal digits; values beyond those limits are rejected rather than rounded.
+
+`PRIMARY_CONFIRMED` requires at least one primary source (`PRIMARY_DOCUMENT`, `PAPER`, `DATASET`, `REPOSITORY`, or `REGULATOR`); a `NEWS_REPORT` alone is insufficient. `INDEPENDENTLY_CONFIRMED` additionally requires at least two distinct non-empty URLs and publisher names, with at least one primary source. This is a structural minimum, not an automatic editorial judgment of independence.
 
 Publish a discrete event:
 
@@ -241,4 +244,4 @@ curl -X POST 'http://localhost:8080/api/v1/economy/facts' \
 
 ## Next slice
 
-Implement human review for deterministically validated FactProposals. Resulting proposals remain subject to review before any TechnologyFact can be published.
+Implement the current Economy briefing for directly published, evidenced Economy Facts.

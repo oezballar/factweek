@@ -4,6 +4,7 @@ import dev.factweek.economy.*
 import dev.factweek.provenance.SourceReference
 import dev.factweek.provenance.SourceType
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 import java.math.BigDecimal
@@ -31,11 +32,44 @@ class EconomyFactPolicyTest {
         assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(indicator(period = EconomyReferencePeriod(LocalDate.of(2026, 8, 2), LocalDate.of(2026, 8, 31), EconomyReferencePeriodGranularity.MONTH))) }
     }
 
-    @Test fun `rejects fractional counts insufficient evidence invalid geography and blank entities`() {
+    @Test fun `enforces measurement precision without rounding`() {
+        assertDoesNotThrow { EconomyFactPolicy.validate(indicator(value = BigDecimal("0.1234567890"))) }
+        assertDoesNotThrow { EconomyFactPolicy.validate(indicator(value = BigDecimal("2.40000000000"))) }
+        assertDoesNotThrow { EconomyFactPolicy.validate(indicator(value = BigDecimal("99999999999999999999"))) }
+        assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(indicator(value = BigDecimal("0.12345678901"))) }
+        assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(indicator(value = BigDecimal("100000000000000000000"))) }
+    }
+
+    @Test fun `rejects fractional counts insufficient evidence and blank entities`() {
         assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(indicator(measurement = measurement(BigDecimal("1.5"), EconomyMeasurementUnit.COUNT))) }
         assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(event(evidence = EconomyEvidenceLevel.DOCUMENTED)) }
-        assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(event(geography = EconomyGeography(EconomyGeographyKind.COUNTRY, "Germany", "de"))) }
         assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(event(entities = listOf(EconomyEntityReference(" ", EconomyEntityType.CENTRAL_BANK)))) }
+    }
+
+    @Test fun `normalizes and validates geography through the publish path`() {
+        val normalized = EconomyFactPolicy.normalizeAndValidate(event(geography = EconomyGeography(EconomyGeographyKind.COUNTRY, " Germany ", "de")))
+        assertEquals("Germany", normalized.geography!!.name)
+        assertEquals("DE", normalized.geography!!.code)
+        assertDoesNotThrow { EconomyFactPolicy.normalizeAndValidate(event(geography = EconomyGeography(EconomyGeographyKind.REGION, "Europe"))) }
+        assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.normalizeAndValidate(event(geography = EconomyGeography(EconomyGeographyKind.COUNTRY, "Germany", "DEU"))) }
+        assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.normalizeAndValidate(event(geography = EconomyGeography(EconomyGeographyKind.GLOBAL, "Global", "GL"))) }
+        assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.normalizeAndValidate(event(geography = EconomyGeography(EconomyGeographyKind.REGION, " "))) }
+    }
+
+    @Test fun `requires sources that structurally support the evidence level`() {
+        assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(event(sources = listOf(SourceReference("https://example.org/report", "News", SourceType.NEWS_REPORT)))) }
+        assertDoesNotThrow { EconomyFactPolicy.validate(event(evidence = EconomyEvidenceLevel.INDEPENDENTLY_CONFIRMED, sources = listOf(
+            SourceReference("https://example.org/primary", "Authority", SourceType.PRIMARY_DOCUMENT),
+            SourceReference("https://example.net/report", "Independent", SourceType.NEWS_REPORT),
+        ))) }
+        assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(event(evidence = EconomyEvidenceLevel.INDEPENDENTLY_CONFIRMED, sources = listOf(
+            SourceReference("https://example.org/primary", "Authority", SourceType.PRIMARY_DOCUMENT),
+            SourceReference("https://example.org/primary", "Independent", SourceType.NEWS_REPORT),
+        ))) }
+        assertThrows<InvalidEconomyFactPublicationException> { EconomyFactPolicy.validate(event(evidence = EconomyEvidenceLevel.INDEPENDENTLY_CONFIRMED, sources = listOf(
+            SourceReference("https://example.org/primary", "Authority", SourceType.PRIMARY_DOCUMENT),
+            SourceReference("https://example.net/report", "AUTHORITY", SourceType.NEWS_REPORT),
+        ))) }
     }
 
     private fun event(
@@ -44,9 +78,10 @@ class EconomyFactPolicyTest {
         period: EconomyReferencePeriod? = null,
         geography: EconomyGeography? = null,
         entities: List<EconomyEntityReference> = emptyList(),
+        sources: List<SourceReference> = sources(),
     ) = PublishEconomyFact("A central bank changed its policy rate.", EconomyCategory.MONETARY_POLICY,
         EconomyEventType.MONETARY_POLICY_DECIDED, evidence, geography = geography, measurement = measurement,
-        referencePeriod = period, entities = entities, sources = sources())
+        referencePeriod = period, entities = entities, sources = sources)
 
     private fun indicator(
         value: BigDecimal = BigDecimal("2.4"), measurement: EconomyMeasurement? = measurement(value),

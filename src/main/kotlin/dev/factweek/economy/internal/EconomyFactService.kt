@@ -1,6 +1,7 @@
 package dev.factweek.economy.internal
 
 import dev.factweek.economy.*
+import dev.factweek.provenance.SourceType
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -42,6 +43,7 @@ internal object EconomyFactPolicy {
     private const val MAX_ENTITY_NAME_LENGTH = 255
     private const val MAX_GEOGRAPHY_NAME_LENGTH = 255
     private val countryCode = Regex("[A-Z]{2}")
+    private val primarySourceTypes = setOf(SourceType.PRIMARY_DOCUMENT, SourceType.PAPER, SourceType.DATASET, SourceType.REPOSITORY, SourceType.REGULATOR)
 
     fun normalizeAndValidate(command: PublishEconomyFact): PublishEconomyFact {
         val normalized = command.copy(
@@ -55,7 +57,7 @@ internal object EconomyFactPolicy {
 
     fun validate(command: PublishEconomyFact) {
         if (command.statement.isEmpty() || command.statement.length > MAX_STATEMENT_LENGTH || command.sources.isEmpty()) invalid()
-        if (!isPublishableEvidence(command.evidenceLevel)) invalid()
+        validateEvidence(command.evidenceLevel, command.sources)
         if (command.sources.any { it.url.isBlank() || it.publisher.isBlank() }) invalid()
         if (command.entities.any { it.name.isBlank() || it.name.length > MAX_ENTITY_NAME_LENGTH }) invalid()
         command.geography?.let(::validateGeography)
@@ -66,9 +68,30 @@ internal object EconomyFactPolicy {
         if (command.eventType == EconomyEventType.INDICATOR_VALUE_REPORTED) {
             if (command.measurement == null || command.referencePeriod == null) invalid()
             validatePeriod(command.referencePeriod)
-            if (command.measurement.unit == EconomyMeasurementUnit.COUNT && command.measurement.value.stripTrailingZeros().scale() > 0) invalid()
+            validateMeasurement(command.measurement)
         } else if (command.measurement != null || command.referencePeriod != null) {
             invalid()
+        }
+    }
+
+    private fun validateMeasurement(measurement: EconomyMeasurement) {
+        val normalized = measurement.value.stripTrailingZeros()
+        val requiredScale = maxOf(normalized.scale(), 0)
+        val integerDigits = maxOf(normalized.precision() - normalized.scale(), 0)
+        if (integerDigits > 20 || requiredScale > 10) invalid()
+        if (measurement.unit == EconomyMeasurementUnit.COUNT && requiredScale > 0) invalid()
+    }
+
+    private fun validateEvidence(level: EconomyEvidenceLevel, sources: List<dev.factweek.provenance.SourceReference>) {
+        when (level) {
+            EconomyEvidenceLevel.REPORTED, EconomyEvidenceLevel.DOCUMENTED -> invalid()
+            EconomyEvidenceLevel.PRIMARY_CONFIRMED -> if (sources.none { it.sourceType in primarySourceTypes }) invalid()
+            EconomyEvidenceLevel.INDEPENDENTLY_CONFIRMED -> {
+                if (sources.none { it.sourceType in primarySourceTypes }) invalid()
+                val urls = sources.map { it.url.trim() }.filter { it.isNotEmpty() }.toSet()
+                val publishers = sources.map { it.publisher.trim().lowercase(Locale.ROOT) }.filter { it.isNotEmpty() }.toSet()
+                if (sources.size < 2 || urls.size < 2 || publishers.size < 2) invalid()
+            }
         }
     }
 
@@ -93,11 +116,6 @@ internal object EconomyFactPolicy {
             EconomyGeographyKind.REGION -> Unit
             EconomyGeographyKind.GLOBAL -> if (geography.code != null) invalid()
         }
-    }
-
-    private fun isPublishableEvidence(level: EconomyEvidenceLevel): Boolean = when (level) {
-        EconomyEvidenceLevel.REPORTED, EconomyEvidenceLevel.DOCUMENTED -> false
-        EconomyEvidenceLevel.PRIMARY_CONFIRMED, EconomyEvidenceLevel.INDEPENDENTLY_CONFIRMED -> true
     }
 
     private fun invalid(): Nothing = throw InvalidEconomyFactPublicationException()

@@ -62,7 +62,7 @@ internal data class EconomySourceValue(
 internal class EconomyMeasurementEntity(
     @Id @Column(name = "fact_id") var factId: UUID? = null,
     @MapsId @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "fact_id") var fact: EconomyFactEntity,
-    @Column(name = "measurement_value", nullable = false, precision = 30, scale = 10) val value: BigDecimal,
+    @Column(name = "measurement_value", nullable = false, columnDefinition = "NUMERIC") val value: BigDecimal,
     @Enumerated(EnumType.STRING) @Column(name = "measurement_unit", nullable = false) val unit: EconomyMeasurementUnit,
     @Enumerated(EnumType.STRING) @Column(name = "release_status") val releaseStatus: EconomyReleaseStatus? = null,
     @Enumerated(EnumType.STRING) @Column(name = "seasonal_adjustment") val seasonalAdjustment: EconomySeasonalAdjustment? = null,
