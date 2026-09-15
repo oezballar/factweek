@@ -21,6 +21,7 @@ The repository is deliberately built as a Spring Modulith modular monolith: one 
 | --- | --- |
 | `ingestion` | Discover unverified technology candidates from sources such as GDELT |
 | `technology` | Own the reviewed technology-fact domain and publication rules |
+| `economy` | Own directly published, evidenced economy facts and their structured measurements |
 | `briefing` | Select the current weekly briefing and apply explicit category filters |
 
 See [the product brief](docs/product/product-brief.md), [ADR 0001](docs/architecture/adr-0001-modular-monolith.md), [ADR 0002](docs/architecture/adr-0002-scheduling-and-ai-tooling.md), and [the living project plan](docs/product/project-plan.md).
@@ -199,6 +200,28 @@ curl -X POST 'http://localhost:8080/api/v1/technology/facts' \
       "publishedAt": "2026-09-10T08:00:00Z"
     }]
   }'
+```
+
+## Economy facts
+
+Economy facts are factual records, not narratives or forecasts. `occurredOn` is only the date of an actual economic event. A periodic `referencePeriod` identifies the period measured, while `sources[].publishedAt` identifies the publication time of a concrete source; none of these values substitutes for another.
+
+The initial measurement units are `PERCENT`, `PERCENTAGE_POINTS`, and `COUNT`. A periodic indicator requires both a measurement and a complete month, quarter, or year reference period. Other currently supported economy event types do not accept measurements.
+
+Publish a discrete event:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/economy/facts' \
+  -H 'Content-Type: application/json' \
+  -d '{"statement":"The central bank decided its policy rate.","category":"MONETARY_POLICY","eventType":"MONETARY_POLICY_DECIDED","evidenceLevel":"PRIMARY_CONFIRMED","occurredOn":"2026-09-10","sources":[{"url":"https://example.org/decision","publisher":"Example Central Bank","sourceType":"PRIMARY_DOCUMENT"}]}'
+```
+
+Publish a periodic indicator without turning its reference period or source publication into `occurredOn`:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/economy/facts' \
+  -H 'Content-Type: application/json' \
+  -d '{"statement":"Inflation was reported for August 2026.","category":"PRICES_AND_INFLATION","eventType":"INDICATOR_VALUE_REPORTED","evidenceLevel":"PRIMARY_CONFIRMED","referencePeriod":{"from":"2026-08-01","to":"2026-08-31","granularity":"MONTH"},"measurement":{"value":2.4,"unit":"PERCENT"},"sources":[{"url":"https://example.org/inflation","publisher":"Example Statistics Office","sourceType":"PRIMARY_DOCUMENT","publishedAt":"2026-09-10T08:00:00Z"}]}'
 ```
 
 ## Architectural rules
