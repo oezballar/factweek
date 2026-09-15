@@ -6,8 +6,8 @@ import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyFacts
 import dev.factweek.technology.TechnologyReadiness
 import dev.factweek.technology.PublishTechnologyFact
-import dev.factweek.technology.SourceReference
-import dev.factweek.technology.SourceType
+import dev.factweek.provenance.SourceReference
+import dev.factweek.provenance.SourceType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
@@ -85,7 +85,7 @@ class TechnologyFactRepositoryTest {
         val withoutPublicationTime = fact(
             "00000000-0000-0000-0000-000000000014",
             null,
-            sources = listOf(SourceValue("https://example.org/unknown", "Example", dev.factweek.technology.SourceType.PAPER)),
+            sources = listOf(SourceValue("https://example.org/unknown", "Example", SourceType.PAPER)),
         )
         val duplicateCandidates = fact(
             "00000000-0000-0000-0000-000000000015",
@@ -146,7 +146,7 @@ class TechnologyFactRepositoryTest {
     private fun source(publishedAt: String) = SourceValue(
         url = "https://example.org/${publishedAt.hashCode()}",
         publisher = "Example",
-        sourceType = dev.factweek.technology.SourceType.PAPER,
+        sourceType = SourceType.PAPER,
         publishedAt = Instant.parse(publishedAt),
     )
 

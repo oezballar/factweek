@@ -13,7 +13,7 @@ import dev.factweek.ingestion.internal.SourceDocumentQueryService
 import dev.factweek.ingestion.internal.SourceDocumentRepository
 import dev.factweek.technology.EntityType
 import dev.factweek.technology.EvidenceLevel
-import dev.factweek.technology.SourceType
+import dev.factweek.provenance.SourceType
 import dev.factweek.technology.TechnologyCategory
 import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyReadiness

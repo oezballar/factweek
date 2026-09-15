@@ -1,7 +1,7 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.ingestion.CandidateSourceType
-import dev.factweek.technology.SourceType
+import dev.factweek.provenance.SourceType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 

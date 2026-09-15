@@ -1,5 +1,6 @@
 package dev.factweek.technology
 
+import dev.factweek.provenance.SourceReference
 import java.time.LocalDate
 
 /** Public API of the technology module. */

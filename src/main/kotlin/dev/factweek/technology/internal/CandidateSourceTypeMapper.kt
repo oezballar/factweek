@@ -1,7 +1,7 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.ingestion.CandidateSourceType
-import dev.factweek.technology.SourceType
+import dev.factweek.provenance.SourceType
 
 internal fun CandidateSourceType.toTechnologySourceType(): SourceType = when (this) {
     CandidateSourceType.NEWS_REPORT -> SourceType.NEWS_REPORT
