@@ -18,6 +18,6 @@ class CandidateSourceTypeMapperTest {
         )
 
         assertEquals(CandidateSourceType.entries.toSet(), expected.keys)
-        assertEquals(expected, CandidateSourceType.entries.associateWith { it.toTechnologySourceType() })
+        assertEquals(expected, CandidateSourceType.entries.associateWith { it.toProvenanceSourceType() })
     }
 }
