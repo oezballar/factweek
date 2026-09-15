@@ -14,6 +14,17 @@ enum class BriefingReferenceBasis {
     SOURCE_PUBLISHED_AT,
 }
 
-internal fun deriveBriefingReference(occurredOn: LocalDate?, sources: List<SourceReference>): BriefingReference? =
+internal fun deriveBriefingReference(
+    occurredOn: LocalDate?,
+    sources: List<SourceReference>,
+): BriefingReference? =
     occurredOn?.let { BriefingReference(it, BriefingReferenceBasis.OCCURRED_ON) }
-        ?: sources.mapNotNull { it.publishedAt }.minOrNull()?.let { BriefingReference(it.atZone(ZoneOffset.UTC).toLocalDate(), BriefingReferenceBasis.SOURCE_PUBLISHED_AT) }
+        ?: sources
+            .mapNotNull { it.publishedAt }
+            .minOrNull()
+            ?.let { publishedAt ->
+                BriefingReference(
+                    date = publishedAt.atZone(ZoneOffset.UTC).toLocalDate(),
+                    basis = BriefingReferenceBasis.SOURCE_PUBLISHED_AT,
+                )
+            }

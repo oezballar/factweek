@@ -39,8 +39,16 @@ internal class EconomyFactService(private val repository: EconomyFactRepository)
     }
 
     @Transactional(readOnly = true)
-    override fun relevantForBriefingBetween(from: LocalDate, to: LocalDate): List<EconomyFact> =
-        repository.findAllRelevantForBriefing(from, to, from.atStartOfDay(ZoneOffset.UTC).toInstant(), to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant()).map { it.toDomain() }
+    override fun relevantForBriefingBetween(
+        from: LocalDate,
+        to: LocalDate,
+    ): List<EconomyFact> =
+        repository.findAllRelevantForBriefing(
+            from = from,
+            to = to,
+            sourceFrom = from.atStartOfDay(ZoneOffset.UTC).toInstant(),
+            sourceToExclusive = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant(),
+        ).map { it.toDomain() }
 }
 
 internal object EconomyFactPolicy {
