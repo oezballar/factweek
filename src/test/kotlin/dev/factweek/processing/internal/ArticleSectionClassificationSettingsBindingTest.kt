@@ -54,7 +54,10 @@ class ArticleSectionClassificationSettingsBindingTest {
     @Test
     fun `rejects invalid catalogue and adapter properties at startup`() {
         listOf(
-            "empty catalogue" to emptyList<String>(),
+            "empty catalogue" to listOf(
+                "factweek.article-classification.version=article-section-classification-v1",
+                "factweek.article-classification.openai.model=gpt-5-mini",
+            ),
             "empty id" to validProperties("factweek.article-classification.sections[0].id="),
             "duplicate id" to validProperties(
                 "factweek.article-classification.sections[1].id=technology",
@@ -67,7 +70,12 @@ class ArticleSectionClassificationSettingsBindingTest {
         ).forEach { (name, properties) ->
             contextRunner.withPropertyValues(*properties.toTypedArray()).run { context ->
                 check(context.startupFailure != null) { "Expected startup failure for $name" }
-                assertTrue(failureMessages(context.startupFailure!!).contains("Article classification"))
+                val messages = failureMessages(context.startupFailure!!)
+                if (name == "empty catalogue") {
+                    assertTrue(messages.contains("Article classification sections must not be empty"))
+                } else {
+                    assertTrue(messages.contains("Article classification"))
+                }
             }
         }
     }

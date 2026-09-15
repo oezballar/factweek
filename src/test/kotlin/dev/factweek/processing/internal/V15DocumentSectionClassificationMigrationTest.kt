@@ -47,7 +47,7 @@ class V15DocumentSectionClassificationMigrationTest {
             }
         }
 
-        migrate(null)
+        migrate("15")
 
         postgres.createConnection("").use { connection ->
             connection.createStatement().use { statement ->
