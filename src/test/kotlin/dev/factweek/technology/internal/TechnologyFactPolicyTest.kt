@@ -1,6 +1,8 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.technology.*
+import dev.factweek.provenance.SourceReference
+import dev.factweek.provenance.SourceType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows

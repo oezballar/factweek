@@ -1,6 +1,8 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.technology.*
+import dev.factweek.provenance.SourceReference
+import dev.factweek.provenance.SourceType
 import jakarta.persistence.*
 import org.hibernate.annotations.Fetch
 import org.hibernate.annotations.FetchMode

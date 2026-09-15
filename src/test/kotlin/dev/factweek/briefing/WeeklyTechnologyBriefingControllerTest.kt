@@ -7,8 +7,8 @@ import dev.factweek.technology.TechnologyReadiness
 import dev.factweek.technology.EvidenceLevel
 import dev.factweek.technology.EntityReference
 import dev.factweek.technology.EntityType
-import dev.factweek.technology.SourceReference
-import dev.factweek.technology.SourceType
+import dev.factweek.provenance.SourceReference
+import dev.factweek.provenance.SourceType
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock

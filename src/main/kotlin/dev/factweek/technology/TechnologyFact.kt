@@ -1,6 +1,6 @@
 package dev.factweek.technology
 
-import java.time.Instant
+import dev.factweek.provenance.SourceReference
 import java.time.LocalDate
 import java.util.UUID
 
@@ -19,14 +19,6 @@ data class TechnologyFact(
 data class EntityReference(
     val name: String,
     val type: EntityType,
-)
-
-data class SourceReference(
-    val url: String,
-    val publisher: String,
-    val sourceType: SourceType,
-    /** Publication timestamp of this concrete source, not the asserted event date. */
-    val publishedAt: Instant? = null,
 )
 
 enum class TechnologyCategory {
@@ -67,5 +59,3 @@ enum class EvidenceLevel {
 }
 
 enum class EntityType { ORGANIZATION, TECHNOLOGY, PRODUCT, RESEARCH_GROUP, PLACE }
-
-enum class SourceType { NEWS_REPORT, PRIMARY_DOCUMENT, PAPER, DATASET, REPOSITORY, REGULATOR }

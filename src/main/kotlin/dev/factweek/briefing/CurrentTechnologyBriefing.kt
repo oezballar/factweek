@@ -4,9 +4,9 @@ import dev.factweek.technology.TechnologyCategory
 import dev.factweek.technology.TechnologyFact
 import dev.factweek.technology.EntityReference
 import dev.factweek.technology.EvidenceLevel
-import dev.factweek.technology.SourceReference
 import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyReadiness
+import dev.factweek.provenance.SourceReference
 import java.time.Instant
 import java.time.LocalDate
 

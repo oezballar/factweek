@@ -1,6 +1,7 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.technology.*
+import dev.factweek.provenance.SourceReference
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty

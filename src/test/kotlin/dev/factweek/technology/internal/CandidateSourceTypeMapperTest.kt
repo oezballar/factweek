@@ -1,7 +1,7 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.ingestion.CandidateSourceType
-import dev.factweek.technology.SourceType
+import dev.factweek.provenance.SourceType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -18,6 +18,6 @@ class CandidateSourceTypeMapperTest {
         )
 
         assertEquals(CandidateSourceType.entries.toSet(), expected.keys)
-        assertEquals(expected, CandidateSourceType.entries.associateWith { it.toTechnologySourceType() })
+        assertEquals(expected, CandidateSourceType.entries.associateWith { it.toProvenanceSourceType() })
     }
 }

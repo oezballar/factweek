@@ -4,8 +4,8 @@ import dev.factweek.technology.EntityReference
 import dev.factweek.technology.EntityType
 import dev.factweek.technology.EvidenceLevel
 import dev.factweek.technology.PublishTechnologyFact
-import dev.factweek.technology.SourceReference
-import dev.factweek.technology.SourceType
+import dev.factweek.provenance.SourceReference
+import dev.factweek.provenance.SourceType
 import dev.factweek.technology.TechnologyCategory
 import dev.factweek.technology.TechnologyEventType
 import dev.factweek.technology.TechnologyFact
