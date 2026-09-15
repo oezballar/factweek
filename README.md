@@ -219,6 +219,54 @@ curl -X POST 'http://localhost:8080/api/v1/economy/facts' \
   -d '{"statement":"The central bank decided its policy rate.","category":"MONETARY_POLICY","eventType":"MONETARY_POLICY_DECIDED","evidenceLevel":"PRIMARY_CONFIRMED","occurredOn":"2026-09-10","sources":[{"url":"https://example.org/decision","publisher":"Example Central Bank","sourceType":"PRIMARY_DOCUMENT"}]}'
 ```
 
+## Economy briefing
+
+`GET /api/v1/briefings/economy/current` returns a factual rolling seven-calendar-day selection. It accepts `maximum` (`1..50`, default `10`) and repeated `categories` parameters. Selection prefers `occurredOn`; when it is absent, it uses the earliest known `sources[].publishedAt` as a UTC calendar date. `referencePeriod` never determines briefing inclusion. Facts without either an event date or a source publication time are excluded. Each flat item exposes `referenceDate` and `referenceDateBasis`; the endpoint adds no narrative or forecasts.
+
+```bash
+curl 'http://localhost:8080/api/v1/briefings/economy/current?categories=PRICES_AND_INFLATION&maximum=5'
+```
+
+The response remains flat and factual. For a periodic indicator, the source
+publication date can provide the briefing reference while `referencePeriod`
+continues to describe the measured period:
+
+```json
+{
+  "from": "2026-09-09",
+  "to": "2026-09-15",
+  "generatedAt": "2026-09-15T09:00:00Z",
+  "appliedCategories": ["PRICES_AND_INFLATION"],
+  "requestedMaximum": 5,
+  "factCount": 1,
+  "facts": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "statement": "Inflation was reported for August 2026.",
+      "category": "PRICES_AND_INFLATION",
+      "eventType": "INDICATOR_VALUE_REPORTED",
+      "evidenceLevel": "PRIMARY_CONFIRMED",
+      "referencePeriod": {
+        "from": "2026-08-01",
+        "to": "2026-08-31",
+        "granularity": "MONTH"
+      },
+      "measurement": { "value": 2.4, "unit": "PERCENT" },
+      "sources": [
+        {
+          "url": "https://example.org/inflation",
+          "publisher": "Example Statistics Office",
+          "sourceType": "PRIMARY_DOCUMENT",
+          "publishedAt": "2026-09-10T08:00:00Z"
+        }
+      ],
+      "referenceDate": "2026-09-10",
+      "referenceDateBasis": "SOURCE_PUBLISHED_AT"
+    }
+  ]
+}
+```
+
 Publish a periodic indicator without turning its reference period or source publication into `occurredOn`:
 
 ```bash
@@ -244,4 +292,4 @@ curl -X POST 'http://localhost:8080/api/v1/economy/facts' \
 
 ## Next slice
 
-Implement the current Economy briefing for directly published, evidenced Economy Facts.
+Implement controlled economy source ingestion and the proposal/review pipeline.

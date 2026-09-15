@@ -5,6 +5,7 @@ import dev.factweek.provenance.SourceType
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
@@ -36,6 +37,18 @@ internal class EconomyFactService(private val repository: EconomyFactRepository)
         }
         return repository.save(fact).toDomain()
     }
+
+    @Transactional(readOnly = true)
+    override fun relevantForBriefingBetween(
+        from: LocalDate,
+        to: LocalDate,
+    ): List<EconomyFact> =
+        repository.findAllRelevantForBriefing(
+            from = from,
+            to = to,
+            sourceFrom = from.atStartOfDay(ZoneOffset.UTC).toInstant(),
+            sourceToExclusive = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant(),
+        ).map { it.toDomain() }
 }
 
 internal object EconomyFactPolicy {

@@ -39,6 +39,7 @@ class EconomyFactControllerTest {
             return EconomyFact(UUID.randomUUID(), normalized.statement, normalized.category, normalized.eventType,
                 normalized.evidenceLevel, normalized.occurredOn, normalized.referencePeriod, normalized.geography, normalized.measurement, normalized.entities, normalized.sources)
         }
+        override fun relevantForBriefingBetween(from: java.time.LocalDate, to: java.time.LocalDate): List<EconomyFact> = emptyList()
     }
     private fun eventJson() = """{"statement":"A central bank changed its policy rate.","category":"MONETARY_POLICY","eventType":"MONETARY_POLICY_DECIDED","evidenceLevel":"PRIMARY_CONFIRMED","occurredOn":"2026-09-10","sources":[{"url":"https://example.org/source","publisher":"Example","sourceType":"PRIMARY_DOCUMENT"}]}"""
     private fun indicatorJson() = """{"statement":"Inflation was reported for August 2026.","category":"PRICES_AND_INFLATION","eventType":"INDICATOR_VALUE_REPORTED","evidenceLevel":"PRIMARY_CONFIRMED","referencePeriod":{"from":"2026-08-01","to":"2026-08-31","granularity":"MONTH"},"measurement":{"value":2.4,"unit":"PERCENT"},"sources":[{"url":"https://example.org/source","publisher":"Example","sourceType":"PRIMARY_DOCUMENT","publishedAt":"2026-09-10T08:00:00Z"}]}"""

@@ -5,6 +5,7 @@ import java.time.LocalDate
 
 interface EconomyFacts {
     fun publish(command: PublishEconomyFact): EconomyFact
+    fun relevantForBriefingBetween(from: LocalDate, to: LocalDate): List<EconomyFact>
 }
 
 data class PublishEconomyFact(

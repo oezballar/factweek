@@ -1,0 +1,1 @@
+CREATE INDEX economy_fact_source_fact_published_at_idx ON economy_fact_source (fact_id, source_published_at);
