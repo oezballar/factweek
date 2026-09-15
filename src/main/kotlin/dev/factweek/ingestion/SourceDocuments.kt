@@ -5,6 +5,9 @@ import java.util.UUID
 
 /** Public read API for successfully retrieved source content. */
 interface SourceDocuments {
+    /** Returns whether a candidate with this source-document identity exists, regardless of fetch status. */
+    fun existsById(id: UUID): Boolean
+
     /**
      * Returns at most [maximum] fetched documents whose ids are not in [excludedSourceDocumentIds].
      * Exclusion is applied by the database before the limit.

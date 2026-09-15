@@ -283,6 +283,17 @@ curl -X POST 'http://localhost:8080/api/v1/economy/facts' \
 - AI integrations must return typed data and be evaluated.
 - A new infrastructure component needs a demonstrated use case.
 
+## Article section classification
+
+Ingestion remains shared and provider-neutral. A successfully fetched source document can be classified manually for `technology`, `economy`, both, or neither; classification is stored separately from extraction and review and does not create facts.
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/processing/documents/<document-id>/classification'
+curl 'http://localhost:8080/api/v1/processing/documents/<document-id>/classification'
+```
+
+Set `FACTWEEK_ARTICLE_CLASSIFICATION_OPENAI_ENABLED=true` to enable the OpenAI classifier. `ARTICLE_CLASSIFICATION_VERSION` identifies the prompt and configured section catalogue; increase it deliberately when either changes. A successful result, including an empty section list, is reused for the same document and version without another model call. Classification only selects future processing candidates; it does not start extraction or publish anything.
+
 ## Planned tooling
 
 - Spring Scheduling is the intended later solution for configurable scheduled GDELT imports; the manual import endpoint remains available.

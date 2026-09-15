@@ -42,6 +42,16 @@ factweek:
       prompt-version: ${OPENAI_PROMPT_VERSION:technology-fact-extraction-v2}
       maximum-proposals-per-document: ${OPENAI_MAX_PROPOSALS_PER_DOCUMENT:5}
       maximum-output-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:8000}
+  article-classification:
+    version: ${ARTICLE_CLASSIFICATION_VERSION:article-section-classification-v1}
+    sections:
+      technology:
+        description: ${ARTICLE_CLASSIFICATION_TECHNOLOGY_DESCRIPTION:Concrete technological developments, research, and technical applications.}
+      economy:
+        description: ${ARTICLE_CLASSIFICATION_ECONOMY_DESCRIPTION:Concrete economic events and published economic indicators.}
+    openai:
+      enabled: ${FACTWEEK_ARTICLE_CLASSIFICATION_OPENAI_ENABLED:false}
+      model: ${ARTICLE_CLASSIFICATION_OPENAI_MODEL:${OPENAI_MODEL:gpt-5-mini}}
 
 management:
   endpoints:
