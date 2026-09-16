@@ -324,6 +324,14 @@ The response contains only the document identity, version, classification time, 
 
 Zero, one, or multiple sections are valid; zero is represented as `[]`. Successful results, including empty ones, are reused for the same document and version without another model call. Two parallel first calls may both call the model, but the database stores one immutable result and both callers receive it. The identity is document ID plus classification version because regular ingestion paths never replace a successfully fetched document's content. Stored results remain readable and reusable when the classifier is disabled. Classification only selects future processing candidates; it neither starts extraction nor publishes a fact.
 
+Technology proposal extraction is deliberately a separate manual step after classification. Only source documents with `technology` in a successful classification of the current `ARTICLE_CLASSIFICATION_VERSION` are considered; a multi-section result such as `["economy", "technology"]` is eligible once. Existing unclassified documents, economy-only documents, empty classifications, and classifications from older versions are skipped. The extraction endpoint never classifies or downloads a document as a fallback. A completed Technology extraction remains completed even if a later classification version is created.
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/extractions?maximum=1'
+```
+
+Economy extraction remains a separate follow-up step.
+
 Invalid document IDs return `400`; an unknown document or absent current-version result returns `404`; a known document that is not fetched returns `409`. Model and invalid structured-output failures return `502`; an enabled classification request without an available classifier returns `503`. All use `application/problem+json`.
 
 ## Planned tooling

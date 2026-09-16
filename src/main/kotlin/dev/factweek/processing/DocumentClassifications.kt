@@ -20,4 +20,7 @@ data class DocumentClassification(
 interface DocumentClassifications {
     fun classify(documentId: UUID): DocumentClassification
     fun find(documentId: UUID): DocumentClassification?
+
+    /** Returns the current-version subset of [documentIds] assigned to [sectionId], without classifying. */
+    fun findCurrentClassifiedDocumentIds(sectionId: SectionId, documentIds: Collection<UUID>): Set<UUID> = emptySet()
 }
