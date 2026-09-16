@@ -55,6 +55,7 @@ internal object EconomyFactPolicy {
     private const val MAX_STATEMENT_LENGTH = 1000
     private const val MAX_ENTITY_NAME_LENGTH = 255
     private const val MAX_GEOGRAPHY_NAME_LENGTH = 255
+    private const val MAX_GEOGRAPHY_CODE_LENGTH = 32
     private val countryCode = Regex("[A-Z]{2}")
     private val primarySourceTypes = setOf(SourceType.PRIMARY_DOCUMENT, SourceType.PAPER, SourceType.DATASET, SourceType.REPOSITORY, SourceType.REGULATOR)
 
@@ -69,23 +70,29 @@ internal object EconomyFactPolicy {
     }
 
     fun validate(command: PublishEconomyFact) {
-        if (command.statement.isEmpty() || command.statement.length > MAX_STATEMENT_LENGTH || command.sources.isEmpty()) invalid()
+        validateStructure(command.statement, command.eventType, command.referencePeriod, command.geography, command.measurement, command.entities)
+        if (command.sources.isEmpty()) invalid()
         validateEvidence(command.evidenceLevel, command.sources)
         if (command.sources.any { it.url.isBlank() || it.publisher.isBlank() }) invalid()
-        if (command.entities.any { it.name.isBlank() || it.name.length > MAX_ENTITY_NAME_LENGTH }) invalid()
-        command.geography?.let(::validateGeography)
-        validateEventShape(command)
     }
 
-    private fun validateEventShape(command: PublishEconomyFact) {
-        if (command.eventType == EconomyEventType.INDICATOR_VALUE_REPORTED) {
-            if (command.measurement == null || command.referencePeriod == null) invalid()
-            validatePeriod(command.referencePeriod)
-            validateMeasurement(command.measurement)
-        } else if (command.measurement != null || command.referencePeriod != null) {
-            invalid()
-        }
+    fun normalizeAndValidateProposal(command: dev.factweek.economy.CreateEconomyFactProposal): dev.factweek.economy.CreateEconomyFactProposal {
+        val normalized = command.copy(statement = command.statement.trim(), evidenceText = command.evidenceText.trim(), geography = command.geography?.let(::normalizeGeography), entities = command.entities.map { it.copy(name = it.name.trim()) })
+        if (normalized.evidenceText.isEmpty() || normalized.evidenceText.length > 2000) invalid()
+        validateStructure(normalized.statement, normalized.eventType, normalized.referencePeriod, normalized.geography, normalized.measurement, normalized.entities)
+        return normalized
     }
+
+    private fun validateStructure(statement: String, eventType: EconomyEventType, referencePeriod: EconomyReferencePeriod?, geography: EconomyGeography?, measurement: EconomyMeasurement?, entities: List<EconomyEntityReference>) {
+        if (statement.isEmpty() || statement.length > MAX_STATEMENT_LENGTH) invalid()
+        if (entities.any { it.name.isBlank() || it.name.length > MAX_ENTITY_NAME_LENGTH }) invalid()
+        geography?.let(::validateGeography)
+        if (eventType == EconomyEventType.INDICATOR_VALUE_REPORTED) {
+            if (measurement == null || referencePeriod == null) invalid()
+            validatePeriod(referencePeriod); validateMeasurement(measurement)
+        } else if (measurement != null || referencePeriod != null) invalid()
+    }
+
 
     private fun validateMeasurement(measurement: EconomyMeasurement) {
         val normalized = measurement.value.stripTrailingZeros()
@@ -124,6 +131,7 @@ internal object EconomyFactPolicy {
 
     private fun validateGeography(geography: EconomyGeography) {
         if (geography.name.isEmpty() || geography.name.length > MAX_GEOGRAPHY_NAME_LENGTH) invalid()
+        if (geography.code != null && geography.code.length > MAX_GEOGRAPHY_CODE_LENGTH) invalid()
         when (geography.kind) {
             EconomyGeographyKind.COUNTRY -> if (geography.code == null || !countryCode.matches(geography.code)) invalid()
             EconomyGeographyKind.REGION -> Unit

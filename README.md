@@ -332,6 +332,34 @@ curl -X POST 'http://localhost:8080/api/v1/technology/fact-proposals/extractions
 
 Economy extraction remains a separate follow-up step.
 
+## Manual Economy proposals
+
+The manual flow is: fetch a source document, create an Economy proposal, then retrieve it by ID.
+The endpoints are:
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/economy/fact-proposals' \
+  -H 'Content-Type: application/json' \
+  -d '{"sourceDocumentId":"11111111-1111-1111-1111-111111111111","statement":"The central bank kept its policy rate unchanged.","category":"MONETARY_POLICY","eventType":"MONETARY_POLICY_DECIDED","occurredOn":"2026-09-10","evidenceText":"The central bank kept its policy rate unchanged."}'
+curl 'http://localhost:8080/api/v1/economy/fact-proposals/<proposal-id>'
+```
+
+Proposals start in `PROPOSED` status. A discrete event omits measurement and reference period; a periodic indicator supplies both, for example:
+
+```json
+{
+  "sourceDocumentId": "11111111-1111-1111-1111-111111111111",
+  "statement": "Inflation was reported for August 2026.",
+  "category": "PRICES_AND_INFLATION",
+  "eventType": "INDICATOR_VALUE_REPORTED",
+  "referencePeriod": {"from":"2026-08-01","to":"2026-08-31","granularity":"MONTH"},
+  "measurement": {"value":2.4,"unit":"PERCENT"},
+  "evidenceText": "Inflation was 2.4 percent in August 2026."
+}
+```
+
+The evidence text must be an excerpt of the stored article. Multiple proposals may reference one document, and no section classification is required for this manual path. Capture performs structural validation only: it makes no final evidence decision and publishes no fact. `occurredOn`, the measurement reference period, and the source publication time remain distinct. Invalid input returns `400`, an unknown resource returns `404`, and a known but unfetched document returns `409`. Accept/Reject and Economy AI extraction are not implemented yet; proposals do not appear in briefings, and ingestion remains shared.
+
 Invalid document IDs return `400`; an unknown document or absent current-version result returns `404`; a known document that is not fetched returns `409`. Model and invalid structured-output failures return `502`; an enabled classification request without an available classifier returns `503`. All use `application/problem+json`.
 
 ## Planned tooling
