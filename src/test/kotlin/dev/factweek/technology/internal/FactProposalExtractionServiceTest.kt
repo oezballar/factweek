@@ -9,6 +9,11 @@ import dev.factweek.ingestion.internal.SourceContentFetchResult
 import dev.factweek.ingestion.internal.SourceDocumentPersistenceService
 import dev.factweek.ingestion.internal.SourceDocumentQueryService
 import dev.factweek.ingestion.internal.SourceDocumentRepository
+import dev.factweek.processing.internal.ArticleSectionClassificationSettings
+import dev.factweek.processing.internal.DocumentClassificationService
+import dev.factweek.processing.internal.DocumentClassificationWriter
+import dev.factweek.processing.internal.DocumentSectionClassificationEntity
+import dev.factweek.processing.internal.DocumentSectionClassificationRepository
 import dev.factweek.ingestion.internal.SourceContentFailureReason
 import dev.factweek.technology.EntityReference
 import dev.factweek.technology.EntityType
@@ -60,11 +65,14 @@ class FactProposalExtractionServiceTest {
     @Autowired private lateinit var proposals: FactProposalRepository
     @Autowired private lateinit var attempts: FactProposalExtractionAttemptRepository
     @Autowired private lateinit var extractor: StubExtractor
+    @Autowired private lateinit var classifications: DocumentClassificationWriter
+    @Autowired private lateinit var classificationRepository: DocumentSectionClassificationRepository
 
     @BeforeEach
     fun clean() {
         attempts.deleteAll()
         proposals.deleteAll()
+        classificationRepository.deleteAll()
         documents.deleteAll()
         candidates.deleteAll()
         extractor.response = listOf(validProposal())
@@ -130,6 +138,43 @@ class FactProposalExtractionServiceTest {
 
         assertEquals(0, result.selectedCount)
         assertEquals(0, extractor.calls.get())
+    }
+
+    @Test
+    fun `extracts only current technology classifications and fills maximum after excluded documents`() {
+        val economyOnly = fetchedCandidate("economy-only", sections = linkedSetOf("economy"))
+        val empty = fetchedCandidate("empty", sections = linkedSetOf())
+        val unclassified = fetchedCandidate("unclassified", sections = null)
+        val oldVersion = fetchedCandidate("old-version", sections = linkedSetOf("technology"), classificationVersion = "old")
+        val technology = fetchedCandidate("technology")
+        val multiple = fetchedCandidate("multiple", sections = linkedSetOf("technology", "economy"))
+
+        val result = extraction.extract(2)
+
+        assertEquals(2, result.selectedCount)
+        assertEquals(2, extractor.calls.get())
+        assertEquals(setOf(technology.id, multiple.id), attempts.findAll().map { it.sourceDocumentId }.toSet())
+        assertFalse(attempts.findAll().any { it.sourceDocumentId in setOf(economyOnly.id, empty.id, unclassified.id, oldVersion.id) })
+    }
+
+    @Test
+    fun `processes a document after it is later classified for technology`() {
+        val candidate = fetchedCandidate("classified-later", sections = null)
+
+        assertEquals(0, extraction.extract(10).selectedCount)
+        assertEquals(0, attempts.count())
+
+        classifications.insert(
+            DocumentSectionClassificationEntity(
+                sourceDocumentId = candidate.id,
+                classificationVersion = "article-section-classification-v1",
+                classifiedAt = Instant.parse("2026-09-10T00:00:00Z"),
+                sections = linkedSetOf("technology"),
+            ),
+        )
+
+        assertEquals(1, extraction.extract(10).selectedCount)
+        assertEquals(1, extractor.calls.get())
     }
 
     @Test
@@ -303,7 +348,11 @@ class FactProposalExtractionServiceTest {
         assertEquals(1, extractor.calls.get())
     }
 
-    private fun fetchedCandidate(path: String) = candidatePersistence.storeDiscovered(candidate(path)).also { candidate ->
+    private fun fetchedCandidate(
+        path: String,
+        sections: MutableSet<String>? = linkedSetOf("technology"),
+        classificationVersion: String = "article-section-classification-v1",
+    ) = candidatePersistence.storeDiscovered(candidate(path)).also { candidate ->
         sourcePersistence.recordSuccess(
             candidate,
             SourceContentFetchResult(
@@ -314,6 +363,16 @@ class FactProposalExtractionServiceTest {
                 "a".repeat(64),
             ),
         )
+        sections?.let {
+            classifications.insert(
+                DocumentSectionClassificationEntity(
+                    sourceDocumentId = candidate.id,
+                    classificationVersion = classificationVersion,
+                    classifiedAt = Instant.parse("2026-09-10T00:00:00Z"),
+                    sections = it,
+                ),
+            )
+        }
     }
 
     private fun candidate(path: String) = CandidateCaptureCommand(
@@ -340,14 +399,16 @@ class FactProposalExtractionServiceTest {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
-    @EntityScan(basePackageClasses = [FactProposalEntity::class, dev.factweek.ingestion.internal.SourceDocumentEntity::class])
-    @EnableJpaRepositories(basePackageClasses = [FactProposalRepository::class, SourceDocumentRepository::class])
+    @EntityScan(basePackageClasses = [FactProposalEntity::class, dev.factweek.ingestion.internal.SourceDocumentEntity::class, DocumentSectionClassificationEntity::class])
+    @EnableJpaRepositories(basePackageClasses = [FactProposalRepository::class, SourceDocumentRepository::class, DocumentSectionClassificationRepository::class])
     @Import(
         CandidatePersistenceService::class,
         CandidateWriter::class,
         dev.factweek.ingestion.internal.CandidateUrlNormalizer::class,
         SourceDocumentPersistenceService::class,
         SourceDocumentQueryService::class,
+        DocumentClassificationService::class,
+        DocumentClassificationWriter::class,
         FactProposalExtractionAttemptService::class,
         FactProposalExtractionService::class,
         TestConfiguration::class,
@@ -358,6 +419,16 @@ class FactProposalExtractionServiceTest {
         @Bean fun factProposalExtractor(): StubExtractor = StubExtractor()
         @Bean fun meterRegistry(): MeterRegistry = SimpleMeterRegistry()
         @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-10T00:00:00Z"), ZoneOffset.UTC)
+        @Bean fun articleSectionClassificationSettings(): ArticleSectionClassificationSettings =
+            ArticleSectionClassificationSettings(
+                version = "article-section-classification-v1",
+                sections = listOf(
+                    ArticleSectionClassificationSettings.SectionProperties().apply {
+                        id = "technology"
+                        description = "Technology"
+                    },
+                ),
+            ).also { it.validate() }
     }
 
     internal class StubExtractor : FactProposalExtractor {

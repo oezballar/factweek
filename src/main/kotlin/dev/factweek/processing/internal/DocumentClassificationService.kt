@@ -62,6 +62,13 @@ internal class DocumentClassificationService(
     override fun find(documentId: UUID): DocumentClassification? =
         repository.findBySourceDocumentIdAndClassificationVersion(documentId, settings.version)?.toDomain()
 
+    override fun findCurrentClassifiedDocumentIds(
+        sectionId: dev.factweek.processing.SectionId,
+        documentIds: Collection<UUID>,
+    ): Set<UUID> =
+        if (documentIds.isEmpty()) emptySet()
+        else repository.findCurrentDocumentIdsBySection(settings.version, sectionId.value, documentIds)
+
     private fun documentUnavailable(documentId: UUID): RuntimeException =
         if (sourceDocuments.existsById(documentId)) {
             SourceDocumentNotFetchedException()

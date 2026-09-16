@@ -20,6 +20,19 @@ interface SourceDocuments {
         excludedSourceDocumentIds: Set<UUID>,
     ): List<FetchedSourceDocument>
 
+    /**
+     * Reads the next bounded page in the established fetched-at/id order.
+     * The default preserves existing implementations that only need the first page.
+     */
+    fun findFetchedForFactProposals(
+        maximum: Int,
+        excludedSourceDocumentIds: Set<UUID>,
+        page: Int,
+    ): List<FetchedSourceDocument> {
+        require(page >= 0) { "Page must not be negative" }
+        return if (page == 0) findFetchedForFactProposals(maximum, excludedSourceDocumentIds) else emptyList()
+    }
+
     /** Returns one successfully fetched document for a review, without exposing a JPA entity. */
     fun findFetchedById(id: UUID): FetchedSourceDocument?
 }

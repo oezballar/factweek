@@ -1,6 +1,8 @@
 package dev.factweek.technology.internal
 
 import dev.factweek.ingestion.SourceDocuments
+import dev.factweek.processing.DocumentClassifications
+import dev.factweek.processing.SectionId
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -11,6 +13,7 @@ import java.util.Locale
 @Service
 internal class FactProposalExtractionService(
     private val sourceDocuments: SourceDocuments,
+    private val classifications: DocumentClassifications,
     private val extractorProvider: ObjectProvider<FactProposalExtractor>,
     private val attemptService: FactProposalExtractionAttemptService,
     private val clock: Clock,
@@ -25,7 +28,7 @@ internal class FactProposalExtractionService(
         val extractor = requireNotNull(extractorProvider.ifAvailable) { "No fact-proposal extractor is configured" }
         val metadata = extractor.metadata.validated()
         val nonClaimableSourceDocumentIds = attemptService.findNonClaimableSourceDocumentIds(metadata.schemaVersion)
-        val selected = sourceDocuments.findFetchedForFactProposals(maximum, nonClaimableSourceDocumentIds)
+        val selected = selectClassifiedDocuments(maximum, nonClaimableSourceDocumentIds)
         var proposed = 0
         var rejected = 0
         var skipped = 0
@@ -100,6 +103,28 @@ internal class FactProposalExtractionService(
             evidence.isNotBlank() && evidence.length <= 2000 &&
             normalizeForComparison(sourceText).contains(normalizeForComparison(evidence)) &&
             proposal.entities.all { it.name.isNotBlank() && it.name.length <= 255 }
+    }
+
+    private fun selectClassifiedDocuments(
+        maximum: Int,
+        nonClaimableSourceDocumentIds: Set<java.util.UUID>,
+    ): List<dev.factweek.ingestion.FetchedSourceDocument> {
+        val selected = mutableListOf<dev.factweek.ingestion.FetchedSourceDocument>()
+        var page = 0
+        while (selected.size < maximum) {
+            val candidates = sourceDocuments.findFetchedForFactProposals(
+                maximum = maximum,
+                excludedSourceDocumentIds = nonClaimableSourceDocumentIds,
+                page = page++,
+            )
+            if (candidates.isEmpty()) break
+            val classifiedIds = classifications.findCurrentClassifiedDocumentIds(
+                SectionId("technology"),
+                candidates.map { it.id },
+            )
+            selected += candidates.filter { it.id in classifiedIds }.take(maximum - selected.size)
+        }
+        return selected
     }
 
     private fun FactProposalExtractionMetadata.validated(): FactProposalExtractionMetadata {

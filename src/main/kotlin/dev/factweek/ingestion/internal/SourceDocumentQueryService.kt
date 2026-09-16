@@ -19,14 +19,23 @@ internal class SourceDocumentQueryService(
         maximum: Int,
         excludedSourceDocumentIds: Set<UUID>,
     ): List<FetchedSourceDocument> {
-        val page = PageRequest.of(0, maximum)
+        return findFetchedForFactProposals(maximum, excludedSourceDocumentIds, 0)
+    }
+
+    @Transactional(readOnly = true)
+    override fun findFetchedForFactProposals(
+        maximum: Int,
+        excludedSourceDocumentIds: Set<UUID>,
+        page: Int,
+    ): List<FetchedSourceDocument> {
+        val pageRequest = PageRequest.of(page, maximum)
         val documents = if (excludedSourceDocumentIds.isEmpty()) {
-            repository.findByStatusOrderByFetchedAtAscCandidateIdAsc(SourceDocumentStatus.FETCHED, page)
+            repository.findByStatusOrderByFetchedAtAscCandidateIdAsc(SourceDocumentStatus.FETCHED, pageRequest)
         } else {
             repository.findByStatusAndCandidateIdNotInOrderByFetchedAtAscCandidateIdAsc(
                 SourceDocumentStatus.FETCHED,
                 excludedSourceDocumentIds,
-                page,
+                pageRequest,
             )
         }
         return documents.map(::toFetchedSourceDocument)
