@@ -24,7 +24,7 @@ class V16EconomyFactProposalMigrationTest {
             connection.prepareStatement(
                 """insert into economy_fact
                     (id, statement, category, event_type, evidence_level, occurred_on)
-                    values (?, 'Existing fact', 'PRICES_AND_INFLATION', 'MACROECONOMIC_ACTIVITY', 'PRIMARY_CONFIRMED', '2026-09-01')""",
+                    values (?, 'The ministry adopted a fiscal measure.', 'PUBLIC_FINANCE_AND_TAXATION', 'FISCAL_MEASURE_ADOPTED', 'PRIMARY_CONFIRMED', '2026-09-01')""",
             ).use { statement ->
                 statement.setObject(1, factId)
                 statement.executeUpdate()
@@ -73,9 +73,9 @@ class V16EconomyFactProposalMigrationTest {
                 statement.setObject(1, factId)
                 statement.executeQuery().use { rows ->
                     assertTrue(rows.next())
-                    assertEquals("Existing fact", rows.getString("statement"))
-                    assertEquals("PRICES_AND_INFLATION", rows.getString("category"))
-                    assertEquals("MACROECONOMIC_ACTIVITY", rows.getString("event_type"))
+                    assertEquals("The ministry adopted a fiscal measure.", rows.getString("statement"))
+                    assertEquals("PUBLIC_FINANCE_AND_TAXATION", rows.getString("category"))
+                    assertEquals("FISCAL_MEASURE_ADOPTED", rows.getString("event_type"))
                     assertEquals("2026-09-01", rows.getDate("occurred_on").toLocalDate().toString())
                 }
             }
@@ -87,7 +87,19 @@ class V16EconomyFactProposalMigrationTest {
                     assertEquals("2026-09-10T00:00:00Z", rows.getTimestamp("classified_at").toInstant().toString())
                 }
             }
-            assertEquals(1, count(connection, "select count(*) from document_section_classification_section where source_document_id = '$candidateId'"))
+            connection.prepareStatement(
+                """select section_id from document_section_classification_section
+                   where source_document_id = ? and classification_version = ?""",
+            ).use { statement ->
+                statement.setObject(1, candidateId)
+                statement.setString(2, "article-section-classification-v1")
+                statement.executeQuery().use { rows ->
+                    val sections = buildList {
+                        while (rows.next()) add(rows.getString("section_id"))
+                    }
+                    assertEquals(listOf("technology"), sections)
+                }
+            }
             assertEquals(0, count(connection, "select count(*) from economy_fact_proposal"))
             assertTrue(tableExists(connection, "economy_fact_proposal"))
             assertTrue(tableExists(connection, "economy_fact_proposal_entity"))
