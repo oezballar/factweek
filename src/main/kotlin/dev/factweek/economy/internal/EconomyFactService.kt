@@ -55,6 +55,7 @@ internal object EconomyFactPolicy {
     private const val MAX_STATEMENT_LENGTH = 1000
     private const val MAX_ENTITY_NAME_LENGTH = 255
     private const val MAX_GEOGRAPHY_NAME_LENGTH = 255
+    private const val MAX_GEOGRAPHY_CODE_LENGTH = 32
     private val countryCode = Regex("[A-Z]{2}")
     private val primarySourceTypes = setOf(SourceType.PRIMARY_DOCUMENT, SourceType.PAPER, SourceType.DATASET, SourceType.REPOSITORY, SourceType.REGULATOR)
 
@@ -130,6 +131,7 @@ internal object EconomyFactPolicy {
 
     private fun validateGeography(geography: EconomyGeography) {
         if (geography.name.isEmpty() || geography.name.length > MAX_GEOGRAPHY_NAME_LENGTH) invalid()
+        if (geography.code != null && geography.code.length > MAX_GEOGRAPHY_CODE_LENGTH) invalid()
         when (geography.kind) {
             EconomyGeographyKind.COUNTRY -> if (geography.code == null || !countryCode.matches(geography.code)) invalid()
             EconomyGeographyKind.REGION -> Unit

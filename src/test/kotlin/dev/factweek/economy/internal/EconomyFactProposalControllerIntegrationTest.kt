@@ -159,6 +159,24 @@ class EconomyFactProposalControllerIntegrationTest {
         assertBadPost(eventJson(candidate.id, "Not contained in article"))
     }
 
+    @Test fun `accepts a normalized regional code at the schema boundary`() {
+        val candidate = fetched("region-boundary", "Regional evidence")
+        val code = "r".repeat(32)
+        val body = """{"sourceDocumentId":"${candidate.id}","statement":"A regional measure was adopted.","category":"PUBLIC_FINANCE_AND_TAXATION","eventType":"FISCAL_MEASURE_ADOPTED","geography":{"kind":"REGION","name":"Northern region","code":" $code "},"evidenceText":"Regional evidence"}"""
+        val response = mvc.perform(post("/api/v1/economy/fact-proposals").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated).andReturn().response.contentAsString
+        val id = Regex("\\\"id\\\":\\\"([^\\\"]+)\\\"").find(response)!!.groupValues[1]
+        mvc.perform(get("/api/v1/economy/fact-proposals/{id}", id))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.geography.code").value(code.uppercase()))
+    }
+
+    @Test fun `rejects a regional code exceeding the schema boundary`() {
+        val candidate = fetched("region-too-long", "Regional evidence")
+        val body = """{"sourceDocumentId":"${candidate.id}","statement":"A regional measure was adopted.","category":"PUBLIC_FINANCE_AND_TAXATION","eventType":"FISCAL_MEASURE_ADOPTED","geography":{"kind":"REGION","name":"Northern region","code":"${"r".repeat(33)}"},"evidenceText":"Regional evidence"}"""
+        assertBadPost(body)
+    }
+
     private fun assertBadPost(body: String) {
         val before = proposalCount()
         mvc.perform(post("/api/v1/economy/fact-proposals").contentType(MediaType.APPLICATION_JSON).content(body))

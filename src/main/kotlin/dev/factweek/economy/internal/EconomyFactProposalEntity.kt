@@ -24,8 +24,8 @@ internal class EconomyFactProposalEntity(
     @Column(name = "economy_fact_id") var economyFactId: UUID? = null,
     @Version @Column(nullable = false) var version: Long = 0,
     @Enumerated(EnumType.STRING) @Column(name = "geography_kind") val geographyKind: EconomyGeographyKind? = null,
-    @Column(name = "geography_name") val geographyName: String? = null,
-    @Column(name = "geography_code") val geographyCode: String? = null,
+    @Column(name = "geography_name", length = 255) val geographyName: String? = null,
+    @Column(name = "geography_code", length = 32) val geographyCode: String? = null,
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "economy_fact_proposal_entity", joinColumns = [JoinColumn(name = "proposal_id")])
     val entities: MutableList<EconomyEntityValue> = mutableListOf(),

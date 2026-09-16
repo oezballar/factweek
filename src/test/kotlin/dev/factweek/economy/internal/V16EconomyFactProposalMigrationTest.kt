@@ -2,7 +2,6 @@ package dev.factweek.economy.internal
 
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.testcontainers.containers.PostgreSQLContainer
@@ -25,7 +24,15 @@ class V16EconomyFactProposalMigrationTest {
             connection.prepareStatement(
                 """insert into economy_fact
                     (id, statement, category, event_type, evidence_level, occurred_on)
-                    values (?, 'Existing fact', 'PRICES_AND_INFLATION', 'INDICATOR_VALUE_REPORTED', 'PRIMARY_CONFIRMED', null)""",
+                    values (?, 'Existing fact', 'PRICES_AND_INFLATION', 'MACROECONOMIC_ACTIVITY', 'PRIMARY_CONFIRMED', '2026-09-01')""",
+            ).use { statement ->
+                statement.setObject(1, factId)
+                statement.executeUpdate()
+            }
+            connection.prepareStatement(
+                """insert into economy_fact_source
+                    (fact_id, source_url, source_publisher, source_type, source_published_at)
+                    values (?, 'https://example.org/existing', 'Example', 'PRIMARY_DOCUMENT', '2026-09-02T08:00:00Z')""",
             ).use { statement ->
                 statement.setObject(1, factId)
                 statement.executeUpdate()
@@ -38,21 +45,56 @@ class V16EconomyFactProposalMigrationTest {
                 statement.setObject(1, candidateId)
                 statement.executeUpdate()
             }
+            connection.prepareStatement(
+                """insert into document_section_classification_section
+                    (source_document_id, classification_version, section_id)
+                    values (?, 'article-section-classification-v1', 'technology')""",
+            ).use { statement ->
+                statement.setObject(1, candidateId)
+                statement.executeUpdate()
+            }
             connection.commit()
         }
 
         migrate("16")
 
         postgres.createConnection("").use { connection ->
-            assertEquals(1, count(connection, "select count(*) from source_document where candidate_id = '$candidateId'"))
-            assertEquals(1, count(connection, "select count(*) from economy_fact where id = '$factId'"))
-            assertEquals(1, count(connection, "select count(*) from document_section_classification where source_document_id = '$candidateId'"))
+            connection.prepareStatement("select text_content, content_sha256, status, fetched_at from source_document where candidate_id = ?").use { statement ->
+                statement.setObject(1, candidateId)
+                statement.executeQuery().use { rows ->
+                    assertTrue(rows.next())
+                    assertEquals("Existing article", rows.getString("text_content"))
+                    assertEquals("a".repeat(64), rows.getString("content_sha256"))
+                    assertEquals("FETCHED", rows.getString("status"))
+                    assertEquals("2026-09-09T00:00:00Z", rows.getTimestamp("fetched_at").toInstant().toString())
+                }
+            }
+            connection.prepareStatement("select statement, category, event_type, occurred_on from economy_fact where id = ?").use { statement ->
+                statement.setObject(1, factId)
+                statement.executeQuery().use { rows ->
+                    assertTrue(rows.next())
+                    assertEquals("Existing fact", rows.getString("statement"))
+                    assertEquals("PRICES_AND_INFLATION", rows.getString("category"))
+                    assertEquals("MACROECONOMIC_ACTIVITY", rows.getString("event_type"))
+                    assertEquals("2026-09-01", rows.getDate("occurred_on").toLocalDate().toString())
+                }
+            }
+            connection.prepareStatement("select classification_version, classified_at from document_section_classification where source_document_id = ?").use { statement ->
+                statement.setObject(1, candidateId)
+                statement.executeQuery().use { rows ->
+                    assertTrue(rows.next())
+                    assertEquals("article-section-classification-v1", rows.getString("classification_version"))
+                    assertEquals("2026-09-10T00:00:00Z", rows.getTimestamp("classified_at").toInstant().toString())
+                }
+            }
+            assertEquals(1, count(connection, "select count(*) from document_section_classification_section where source_document_id = '$candidateId'"))
             assertEquals(0, count(connection, "select count(*) from economy_fact_proposal"))
             assertTrue(tableExists(connection, "economy_fact_proposal"))
             assertTrue(tableExists(connection, "economy_fact_proposal_entity"))
             assertTrue(tableExists(connection, "economy_fact_proposal_measurement"))
             assertTrue(foreignKeyExists(connection, "economy_fact_proposal", "source_document_id", "source_document", "candidate_id"))
             assertTrue(foreignKeyExists(connection, "economy_fact_proposal_entity", "proposal_id", "economy_fact_proposal", "id"))
+            assertTrue(foreignKeyExists(connection, "economy_fact_proposal_measurement", "proposal_id", "economy_fact_proposal", "id"))
             assertEquals(0, count(connection, "select count(*) from economy_fact_proposal where source_document_id = '$candidateId'"))
         }
     }

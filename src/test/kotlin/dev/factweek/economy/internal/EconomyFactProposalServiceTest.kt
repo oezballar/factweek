@@ -71,6 +71,18 @@ class EconomyFactProposalServiceTest {
         assertThrows<InvalidEconomyFactPublicationException> {
             service.create(event(document.id, "Evidence passage", geography = EconomyGeography(EconomyGeographyKind.COUNTRY, "x".repeat(256), "DE")))
         }
+        val regionCode = "r".repeat(32)
+        val normalized = service.create(
+            event(
+                document.id,
+                "Evidence passage",
+                geography = EconomyGeography(EconomyGeographyKind.REGION, " Region ", " $regionCode "),
+            ),
+        )
+        assertEquals(regionCode.uppercase(), normalized.geography?.code)
+        assertThrows<InvalidEconomyFactPublicationException> {
+            service.create(event(document.id, "Evidence passage", geography = EconomyGeography(EconomyGeographyKind.REGION, "Region", "r".repeat(33))))
+        }
     }
 
     @Test fun `rejects invalid measurement precision count and event shape`() {
