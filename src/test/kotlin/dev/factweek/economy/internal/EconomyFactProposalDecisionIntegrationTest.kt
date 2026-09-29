@@ -202,6 +202,53 @@ class EconomyFactProposalDecisionIntegrationTest {
     }
 
     @Test
+    fun `http accepts rejection reason of 1000 characters after trimming`() {
+        val proposal = event()
+        val before = factCounts()
+        val proposalsBefore = count("economy_fact_proposal")
+        val normalizedReason = "x".repeat(1000)
+        val path = "/api/v1/economy/fact-proposals/{id}"
+
+        mvc.perform(post("$path/reject", proposal.id)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"reason":"  $normalizedReason  "}"""))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("REJECTED"))
+            .andExpect(jsonPath("$.rejectionReason").value(normalizedReason))
+
+        mvc.perform(get(path, proposal.id))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("REJECTED"))
+            .andExpect(jsonPath("$.rejectionReason").value(normalizedReason))
+            .andExpect(jsonPath("$.reviewedAt").isNotEmpty)
+            .andExpect(jsonPath("$.economyFactId").doesNotExist())
+
+        assertEquals(normalizedReason, proposals.find(proposal.id)!!.rejectionReason)
+        assertEquals(proposalsBefore, count("economy_fact_proposal"))
+        assertEquals(before, factCounts())
+    }
+
+    @Test
+    fun `http rejects reason of 1001 characters after trimming without changing data`() {
+        val proposal = event()
+        val before = factCounts()
+        val proposalsBefore = count("economy_fact_proposal")
+        val reason = "x".repeat(1001)
+
+        mvc.perform(post("/api/v1/economy/fact-proposals/{id}/reject", proposal.id)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"reason":"  $reason  "}"""))
+            .andExpect(status().isBadRequest)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.detail").isNotEmpty)
+
+        assertEquals(proposal, proposals.find(proposal.id))
+        assertEquals(proposalsBefore, count("economy_fact_proposal"))
+        assertEquals(before, factCounts())
+    }
+
+    @Test
     fun `parallel accept and accept serialize to one fact`() = concurrentDecisions(false)
 
     @Test

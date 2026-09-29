@@ -4,7 +4,6 @@ import dev.factweek.economy.*
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
-import jakarta.validation.constraints.Size
 import dev.factweek.provenance.SourceReference
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
@@ -58,5 +57,5 @@ internal data class AcceptEconomyFactProposalRequest(
 )
 
 internal data class RejectEconomyFactProposalRequest(
-    @field:NotBlank @field:Size(max = 1000) val reason: String? = null,
+    @field:NotBlank val reason: String? = null,
 )
