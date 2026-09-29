@@ -20,7 +20,7 @@ internal class EconomyFactProposalEntity(
     @Enumerated(EnumType.STRING) @Column(nullable = false) var status: EconomyFactProposalStatus = EconomyFactProposalStatus.PROPOSED,
     @Enumerated(EnumType.STRING) @Column(name = "reviewed_evidence_level") var reviewedEvidenceLevel: EconomyEvidenceLevel? = null,
     @Column(name = "reviewed_at") var reviewedAt: Instant? = null,
-    @Column(name = "rejection_reason") var rejectionReason: String? = null,
+    @Column(name = "rejection_reason", length = 1000) var rejectionReason: String? = null,
     @Column(name = "economy_fact_id") var economyFactId: UUID? = null,
     @Version @Column(nullable = false) var version: Long = 0,
     @Enumerated(EnumType.STRING) @Column(name = "geography_kind") val geographyKind: EconomyGeographyKind? = null,

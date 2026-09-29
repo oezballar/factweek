@@ -1,5 +1,6 @@
 package dev.factweek.economy
 
+import dev.factweek.provenance.SourceReference
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -7,7 +8,14 @@ import java.util.UUID
 interface EconomyFactProposals {
     fun create(command: CreateEconomyFactProposal): EconomyFactProposal
     fun find(id: UUID): EconomyFactProposal?
+    fun accept(id: UUID, command: AcceptEconomyFactProposal): EconomyFactProposal
+    fun reject(id: UUID, reason: String): EconomyFactProposal
 }
+
+data class AcceptEconomyFactProposal(
+    val evidenceLevel: EconomyEvidenceLevel,
+    val additionalSources: List<SourceReference> = emptyList(),
+)
 
 data class CreateEconomyFactProposal(
     val sourceDocumentId: UUID,
