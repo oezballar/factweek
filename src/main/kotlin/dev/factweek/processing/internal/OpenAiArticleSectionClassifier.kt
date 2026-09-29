@@ -7,13 +7,14 @@ import org.springframework.ai.openai.OpenAiChatOptions
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
+import tools.jackson.databind.json.JsonMapper
 
 @Component
 @ConditionalOnProperty(prefix = "factweek.article-classification.openai", name = ["enabled"], havingValue = "true")
 internal class OpenAiArticleSectionClassifier(
     builder: ChatClient.Builder,
     private val settings: ArticleSectionClassificationSettings,
-    objectMapper: com.fasterxml.jackson.databind.ObjectMapper,
+    objectMapper: JsonMapper,
     @Value("\${spring.ai.openai.api-key:}") apiKey: String,
 ) : ArticleSectionClassifier {
     private val chatClient = builder.build()

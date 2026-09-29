@@ -1,6 +1,5 @@
 package dev.factweek.processing.internal
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.factweek.processing.SectionId
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -19,6 +18,7 @@ import org.springframework.ai.chat.prompt.ChatOptions
 import org.springframework.ai.openai.OpenAiChatModel
 import org.springframework.ai.openai.OpenAiChatOptions
 import java.util.UUID
+import tools.jackson.databind.json.JsonMapper
 
 class OpenAiArticleSectionClassifierTest {
     @Test
@@ -69,7 +69,7 @@ class OpenAiArticleSectionClassifierTest {
         OpenAiArticleSectionClassifier(
             builder = ChatClient.builder(model),
             settings = settings(),
-            objectMapper = ObjectMapper(),
+            objectMapper = JsonMapper.builder().build(),
             apiKey = "test-key",
         )
 

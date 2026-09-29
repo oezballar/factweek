@@ -1,21 +1,20 @@
 package dev.factweek.processing.internal
 
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.factweek.processing.SectionId
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.json.JsonMapper
 
 /** Strict local validation; provider structured output is a complementary safeguard. */
 internal class ArticleSectionClassificationResponseParser(
-    private val objectMapper: ObjectMapper,
+    private val objectMapper: JsonMapper,
 ) {
     fun parse(response: String?): List<SectionId> {
         if (response.isNullOrBlank()) {
             throw ArticleSectionClassificationException("The model returned no classification")
         }
         val root = try {
-            objectMapper.factory.createParser(response).use { parser ->
-                val parsed = objectMapper.readTree<JsonNode>(parser)
+            objectMapper.createParser(response).use { parser ->
+                val parsed = objectMapper.readTree(parser)
                 if (parser.nextToken() != null) {
                     throw ArticleSectionClassificationException("The model returned trailing classification content")
                 }
@@ -23,7 +22,7 @@ internal class ArticleSectionClassificationResponseParser(
             }
         } catch (exception: ArticleSectionClassificationException) {
             throw exception
-        } catch (exception: JsonProcessingException) {
+        } catch (exception: JacksonException) {
             throw ArticleSectionClassificationException("The model returned an invalid section classification", exception)
         } catch (exception: IllegalArgumentException) {
             throw ArticleSectionClassificationException("The model returned an invalid section classification", exception)
@@ -36,12 +35,12 @@ internal class ArticleSectionClassificationResponseParser(
         if (!sections.isArray) {
             throw ArticleSectionClassificationException("The model omitted sections")
         }
-        return sections.map { section ->
-            if (!section.isTextual) {
+        return sections.values().map { section ->
+            if (!section.isString) {
                 throw ArticleSectionClassificationException("The model returned an invalid section key")
             }
             try {
-                SectionId(section.textValue())
+                SectionId(section.asString())
             } catch (exception: IllegalArgumentException) {
                 throw ArticleSectionClassificationException("The model returned an invalid section key", exception)
             }
