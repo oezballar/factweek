@@ -42,6 +42,13 @@ factweek:
       prompt-version: ${OPENAI_PROMPT_VERSION:technology-fact-extraction-v2}
       maximum-proposals-per-document: ${OPENAI_MAX_PROPOSALS_PER_DOCUMENT:5}
       maximum-output-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:8000}
+  economy:
+    extraction:
+      openai:
+        enabled: ${FACTWEEK_ECONOMY_OPENAI_ENABLED:false}
+        model: ${ECONOMY_OPENAI_MODEL:${OPENAI_MODEL:gpt-5-mini}}
+        maximum-proposals-per-document: ${ECONOMY_OPENAI_MAX_PROPOSALS_PER_DOCUMENT:5}
+        maximum-output-tokens: ${ECONOMY_OPENAI_MAX_OUTPUT_TOKENS:8000}
   article-classification:
     version: ${ARTICLE_CLASSIFICATION_VERSION:article-section-classification-v1}
     sections:
