@@ -23,7 +23,7 @@ class EconomyFactProposalServiceTest {
     @Test fun `accepts a news document proposal without a final evidence decision`() {
         val repository = repository()
         val document = document("Evidence   passage")
-        val service = EconomyFactProposalService(repository, documents(document), clock())
+        val service = EconomyFactProposalService(repository, documents(document), mock(EconomyFacts::class.java), clock())
         val proposal = service.create(event(document.id, "Evidence passage"))
         assertEquals(EconomyFactProposalStatus.PROPOSED, proposal.status)
         assertEquals("A policy decision.", proposal.statement)
@@ -32,7 +32,7 @@ class EconomyFactProposalServiceTest {
 
     @Test fun `validates indicator structure and source evidence passage`() {
         val document = document("Evidence passage")
-        val service = EconomyFactProposalService(repository(), documents(document), clock())
+        val service = EconomyFactProposalService(repository(), documents(document), mock(EconomyFacts::class.java), clock())
         assertThrows<InvalidEconomyFactPublicationException> { service.create(event(document.id, "Evidence passage", eventType = EconomyEventType.INDICATOR_VALUE_REPORTED)) }
         assertThrows<InvalidEconomyFactProposalException> { service.create(event(document.id, "Missing")) }
         assertThrows<InvalidEconomyFactPublicationException> { service.create(event(document.id, " ")) }
@@ -40,7 +40,7 @@ class EconomyFactProposalServiceTest {
 
     @Test fun `stores a valid indicator structure`() {
         val document = document("Inflation evidence")
-        val service = EconomyFactProposalService(repository(), documents(document), clock())
+        val service = EconomyFactProposalService(repository(), documents(document), mock(EconomyFacts::class.java), clock())
         val proposal = service.create(event(document.id, "Inflation evidence", eventType = EconomyEventType.INDICATOR_VALUE_REPORTED,
             measurement = EconomyMeasurement(BigDecimal("2.4"), EconomyMeasurementUnit.PERCENT),
             period = EconomyReferencePeriod(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), EconomyReferencePeriodGranularity.MONTH)))
@@ -51,19 +51,19 @@ class EconomyFactProposalServiceTest {
     @Test fun `accepts statement and evidence at their boundaries`() {
         val evidence = "e".repeat(2_000)
         val document = document(evidence)
-        val service = EconomyFactProposalService(repository(), documents(document), clock())
+        val service = EconomyFactProposalService(repository(), documents(document), mock(EconomyFacts::class.java), clock())
         assertDoesNotThrow { service.create(event(document.id, evidence, statement = "s".repeat(1_000))) }
     }
 
     @Test fun `rejects values beyond proposal boundaries`() {
         val document = document("Evidence passage")
-        val service = EconomyFactProposalService(repository(), documents(document), clock())
+        val service = EconomyFactProposalService(repository(), documents(document), mock(EconomyFacts::class.java), clock())
         assertThrows<InvalidEconomyFactPublicationException> {
             service.create(event(document.id, "Evidence passage", statement = "s".repeat(1_001)))
         }
         val longEvidence = "e".repeat(2_001)
         val longDocument = document(longEvidence)
-        val longService = EconomyFactProposalService(repository(), documents(longDocument), clock())
+        val longService = EconomyFactProposalService(repository(), documents(longDocument), mock(EconomyFacts::class.java), clock())
         assertThrows<InvalidEconomyFactPublicationException> { longService.create(event(longDocument.id, longEvidence)) }
         assertThrows<InvalidEconomyFactPublicationException> {
             service.create(event(document.id, "Evidence passage", entities = listOf(EconomyEntityReference("x".repeat(256), EconomyEntityType.COMPANY))))
@@ -87,7 +87,7 @@ class EconomyFactProposalServiceTest {
 
     @Test fun `rejects invalid measurement precision count and event shape`() {
         val document = document("Evidence passage")
-        val service = EconomyFactProposalService(repository(), documents(document), clock())
+        val service = EconomyFactProposalService(repository(), documents(document), mock(EconomyFacts::class.java), clock())
         val period = EconomyReferencePeriod(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), EconomyReferencePeriodGranularity.MONTH)
         assertThrows<InvalidEconomyFactPublicationException> {
             service.create(event(document.id, "Evidence passage", eventType = EconomyEventType.INDICATOR_VALUE_REPORTED, measurement = EconomyMeasurement(BigDecimal("0.12345678901"), EconomyMeasurementUnit.PERCENT), period = period))

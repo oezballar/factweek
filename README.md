@@ -334,7 +334,7 @@ Economy extraction remains a separate follow-up step.
 
 ## Manual Economy proposals
 
-The manual flow is: fetch a source document, create an Economy proposal, then retrieve it by ID.
+The manual flow is: fetch a source document, create an Economy proposal, retrieve it by ID, then accept or reject it.
 The endpoints are:
 
 ```bash
@@ -358,7 +358,18 @@ Proposals start in `PROPOSED` status. A discrete event omits measurement and ref
 }
 ```
 
-The evidence text must be an excerpt of the stored article. Multiple proposals may reference one document, and no section classification is required for this manual path. Capture performs structural validation only: it makes no final evidence decision and publishes no fact. `occurredOn`, the measurement reference period, and the source publication time remain distinct. Invalid input returns `400`, an unknown resource returns `404`, and a known but unfetched document returns `409`. Accept/Reject and Economy AI extraction are not implemented yet; proposals do not appear in briefings, and ingestion remains shared.
+The evidence text must be an excerpt of the stored article. Multiple proposals may reference one document, and no section classification is required for this manual path. Capture performs structural validation only: it makes no final evidence decision and publishes no fact. `occurredOn`, the measurement reference period, and the source publication time remain distinct.
+
+```bash
+curl -X POST 'http://localhost:8080/api/v1/economy/fact-proposals/<proposal-id>/accept' \
+  -H 'Content-Type: application/json' \
+  -d '{"evidenceLevel":"PRIMARY_CONFIRMED"}'
+curl -X POST 'http://localhost:8080/api/v1/economy/fact-proposals/<proposal-id>/reject' \
+  -H 'Content-Type: application/json' \
+  -d '{"reason":"The cited passage does not establish the claim."}'
+```
+
+Accept uses the fetched document's URL, publisher, source type and publication timestamp as its first source. The reviewer must supply `evidenceLevel`. `PRIMARY_CONFIRMED` requires a primary source (`PRIMARY_DOCUMENT`, `PAPER`, `DATASET`, `REPOSITORY` or `REGULATOR`); `INDEPENDENTLY_CONFIRMED` additionally requires a second distinct URL and publisher in `additionalSources`, for example `{"url":"https://another.example/report","publisher":"Another publisher","sourceType":"PRIMARY_DOCUMENT"}`. `REPORTED` and `DOCUMENTED` are not final levels. The excerpt alone does not determine the final level. Accept publishes the proposal's typed fields and returns its `ACCEPTED` status, `reviewedEvidenceLevel`, `reviewedAt` and `economyFactId`. Reject requires a trimmed, nonempty `reason` of at most 1000 characters and returns `REJECTED`, `reviewedAt` and `rejectionReason` without a fact. GET exposes the same decision fields. Invalid input or evidence returns `400`, unknown proposal IDs return `404`, and every repeated or opposite decision returns `409` (as with Technology). A known but unfetched document also returns `409`. Only accepted facts can appear in Economy briefings when they meet the briefing date and category filters. Ingestion remains shared; Economy AI extraction is not implemented.
 
 Invalid document IDs return `400`; an unknown document or absent current-version result returns `404`; a known document that is not fetched returns `409`. Model and invalid structured-output failures return `502`; an enabled classification request without an available classifier returns `503`. All use `application/problem+json`.
 
