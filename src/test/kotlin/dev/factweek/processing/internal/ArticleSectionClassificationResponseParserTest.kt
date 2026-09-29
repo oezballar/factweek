@@ -1,15 +1,15 @@
 package dev.factweek.processing.internal
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.factweek.processing.SectionId
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.Test
 import org.springframework.ai.openai.OpenAiChatModel
 import java.util.UUID
+import tools.jackson.databind.json.JsonMapper
 
 class ArticleSectionClassificationResponseParserTest {
-    private val parser = ArticleSectionClassificationResponseParser(ObjectMapper())
+    private val parser = ArticleSectionClassificationResponseParser(JsonMapper.builder().build())
 
     @Test
     fun `accepts valid sections and returns a stable deduplicated list`() {
