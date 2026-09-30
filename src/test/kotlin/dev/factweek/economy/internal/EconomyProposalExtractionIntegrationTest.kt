@@ -226,6 +226,76 @@ class EconomyProposalExtractionIntegrationTest {
         }
     }
 
+    @Test
+    fun `second proposal policy failure logs exact nested path and rolls back the whole batch`() {
+        val id = fetched()
+        classify(id, "economy")
+        val before = proposalCounts()
+        val marker = "SECRET_ARTICLE_AND_KEY_MARKER"
+        val invalidEntities = """"entities":[{"name":"First","type":"COMPANY"},{"name":"Second","type":"COMPANY"},{"name":"${marker}${"x".repeat(256)}","type":"COMPANY"}]"""
+        client.response = response(event(), event().replace(""""entities":[{"name":"Central Bank","type":"CENTRAL_BANK"}]""", invalidEntities))
+
+        val logger = LoggerFactory.getLogger(EconomyProposalExtractionService::class.java) as Logger
+        val appender = ListAppender<ILoggingEvent>()
+        appender.start()
+        logger.addAppender(appender)
+        try {
+            val body = mvc.perform(extract(id)).andExpect(status().isBadGateway)
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(502))
+                .andExpect(jsonPath("$.detail").value("Economy proposal extraction failed"))
+                .andReturn().response.contentAsString
+            val event = appender.list.single { it.formattedMessage.contains("economy_extraction_failed") }
+            assertTrue(event.formattedMessage.contains("documentId=$id"))
+            assertTrue(event.formattedMessage.contains("phase=validation"))
+            assertTrue(event.formattedMessage.contains("code=ENTITY_NAME_TOO_LONG"))
+            assertTrue(event.formattedMessage.contains("fieldPath=proposals[1].entities[2].name"))
+            assertTrue(event.formattedMessage.contains("EconomyExtractionInvalidResponseException,InvalidEconomyFactPublicationException"))
+            assertFalse(event.formattedMessage.contains(marker))
+            assertFalse(body.contains(marker))
+            assertNull(event.throwableProxy)
+            assertEquals(before, proposalCounts())
+        } finally {
+            logger.detachAppender(appender)
+            appender.stop()
+        }
+    }
+
+    @Test
+    fun `evidence diagnostics distinguish empty long and unsupported passages`() {
+        val id = fetched()
+        classify(id, "economy")
+        val before = proposalCounts()
+        val logger = LoggerFactory.getLogger(EconomyProposalExtractionService::class.java) as Logger
+        val appender = ListAppender<ILoggingEvent>()
+        appender.start()
+        logger.addAppender(appender)
+        try {
+            val cases = listOf(
+                "" to "EVIDENCE_TEXT_EMPTY",
+                "SECRET_EVIDENCE_MARKER${"x".repeat(2_001)}" to "EVIDENCE_TEXT_TOO_LONG",
+                "SECRET_MISSING_EVIDENCE_MARKER" to "EVIDENCE_NOT_IN_SOURCE",
+            )
+            cases.forEach { (evidence, code) ->
+                appender.list.clear()
+                client.response = response(event().replace("Rate decision evidence", evidence))
+                val body = mvc.perform(extract(id)).andExpect(status().isBadGateway)
+                    .andExpect(jsonPath("$.detail").value("Economy proposal extraction failed"))
+                    .andReturn().response.contentAsString
+                val entry = appender.list.single { it.formattedMessage.contains("economy_extraction_failed") }
+                assertTrue(entry.formattedMessage.contains("code=$code"))
+                assertTrue(entry.formattedMessage.contains("fieldPath=proposals[0].evidenceText"))
+                assertFalse(entry.formattedMessage.contains("SECRET_"))
+                assertFalse(body.contains("SECRET_"))
+                assertNull(entry.throwableProxy)
+                assertEquals(before, proposalCounts())
+            }
+        } finally {
+            logger.detachAppender(appender)
+            appender.stop()
+        }
+    }
+
     private fun extract(id: UUID) = post("/api/v1/economy/fact-proposals/extractions/{sourceDocumentId}", id)
 
     private fun assertProblem(id: UUID, status: Int) {
