@@ -125,6 +125,52 @@ class EconomyProposalExtractionIntegrationTest {
     }
 
     @Test
+    fun `geography variants preserve country normalization and optional geography`() {
+        val id = fetched()
+        classify(id, "economy")
+        val country = """"geography":{"kind":"COUNTRY","name":"Germany","code":"DE"}"""
+        val variants = listOf(
+            """"geography":{"kind":"COUNTRY","name":"United States","code":"US"}""" to EconomyGeography(EconomyGeographyKind.COUNTRY, "United States", "US"),
+            """"geography":{"kind":"COUNTRY","name":"United States","code":" us "}""" to EconomyGeography(EconomyGeographyKind.COUNTRY, "United States", "US"),
+            """"geography":{"kind":"REGION","name":"Europe","code":null}""" to EconomyGeography(EconomyGeographyKind.REGION, "Europe"),
+            """"geography":{"kind":"REGION","name":"Region","code":"REGION-123456789"}""" to EconomyGeography(EconomyGeographyKind.REGION, "Region", "REGION-123456789"),
+            """"geography":{"kind":"GLOBAL","name":"Global","code":null}""" to EconomyGeography(EconomyGeographyKind.GLOBAL, "Global"),
+            """"geography":null""" to null,
+        )
+        variants.forEach { (replacement, expected) ->
+            client.response = response(event().replace(country, replacement))
+            val result = mvc.perform(extract(id)).andExpect(status().isOk)
+                .andExpect(jsonPath("$.proposalCount").value(1))
+                .andReturn().response.contentAsString
+            val proposalId = UUID.fromString(tools.jackson.databind.json.JsonMapper.builder().build().readTree(result).path("proposals")[0].path("id").asString())
+            assertEquals(expected, proposals.find(proposalId)!!.geography)
+        }
+        assertEquals(variants.size.toLong(), count("economy_fact_proposal"))
+        assertEquals(0L, count("economy_fact"))
+    }
+
+    @Test
+    fun `invalid country and global codes fail without persistence`() {
+        val id = fetched()
+        classify(id, "economy")
+        val before = proposalCounts()
+        val country = """"geography":{"kind":"COUNTRY","name":"Germany","code":"DE"}"""
+        val invalid = listOf(
+            """"geography":{"kind":"COUNTRY","name":"Germany","code":null}""",
+            """"geography":{"kind":"COUNTRY","name":"Germany","code":""}""",
+            """"geography":{"kind":"COUNTRY","name":"Germany","code":"USA"}""",
+            """"geography":{"kind":"GLOBAL","name":"Global","code":"US"}""",
+        )
+        invalid.forEach { replacement ->
+            client.response = response(event().replace(country, replacement))
+            mvc.perform(extract(id)).andExpect(status().isBadGateway)
+                .andExpect(jsonPath("$.detail").value("Economy proposal extraction failed"))
+            assertEquals(before, proposalCounts())
+            assertEquals(0L, count("economy_fact"))
+        }
+    }
+
+    @Test
     fun `stores multiple proposals, accepts empty result and repeats by creating new proposals`() {
         val id = fetched()
         classify(id, "economy")
