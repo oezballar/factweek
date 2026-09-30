@@ -156,17 +156,30 @@ class EconomyProposalExtractionIntegrationTest {
         val before = proposalCounts()
         val country = """"geography":{"kind":"COUNTRY","name":"Germany","code":"DE"}"""
         val invalid = listOf(
-            """"geography":{"kind":"COUNTRY","name":"Germany","code":null}""",
-            """"geography":{"kind":"COUNTRY","name":"Germany","code":""}""",
-            """"geography":{"kind":"COUNTRY","name":"Germany","code":"USA"}""",
-            """"geography":{"kind":"GLOBAL","name":"Global","code":"US"}""",
+            """"geography":{"kind":"COUNTRY","name":"Germany","code":null}""" to "COUNTRY_CODE_INVALID",
+            """"geography":{"kind":"COUNTRY","name":"Germany","code":""}""" to "COUNTRY_CODE_INVALID",
+            """"geography":{"kind":"COUNTRY","name":"Germany","code":"USA"}""" to "COUNTRY_CODE_INVALID",
+            """"geography":{"kind":"GLOBAL","name":"Global","code":"US"}""" to "GLOBAL_CODE_NOT_ALLOWED",
         )
-        invalid.forEach { replacement ->
-            client.response = response(event().replace(country, replacement))
-            mvc.perform(extract(id)).andExpect(status().isBadGateway)
-                .andExpect(jsonPath("$.detail").value("Economy proposal extraction failed"))
-            assertEquals(before, proposalCounts())
-            assertEquals(0L, count("economy_fact"))
+        val logger = LoggerFactory.getLogger(EconomyProposalExtractionService::class.java) as Logger
+        val appender = ListAppender<ILoggingEvent>()
+        appender.start()
+        logger.addAppender(appender)
+        try {
+            invalid.forEach { (replacement, code) ->
+                appender.list.clear()
+                client.response = response(event().replace(country, replacement))
+                mvc.perform(extract(id)).andExpect(status().isBadGateway)
+                    .andExpect(jsonPath("$.detail").value("Economy proposal extraction failed"))
+                val entry = appender.list.single { it.formattedMessage.contains("economy_extraction_failed") }
+                assertTrue(entry.formattedMessage.contains("code=$code"))
+                assertTrue(entry.formattedMessage.contains("fieldPath=proposals[0].geography.code"))
+                assertEquals(before, proposalCounts())
+                assertEquals(0L, count("economy_fact"))
+            }
+        } finally {
+            logger.detachAppender(appender)
+            appender.stop()
         }
     }
 
