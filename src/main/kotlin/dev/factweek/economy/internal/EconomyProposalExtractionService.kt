@@ -67,7 +67,9 @@ internal class EconomyProposalExtractionWriter(private val proposals: EconomyFac
         } catch (exception: InvalidEconomyFactProposalException) {
             throw EconomyExtractionInvalidResponseException(exception, "validation", "EVIDENCE_NOT_IN_SOURCE", "proposals[$index].evidenceText")
         } catch (exception: InvalidEconomyFactPublicationException) {
-            throw EconomyExtractionInvalidResponseException(exception, "validation", "PROPOSAL_POLICY_FAILED", "proposals[$index]")
+            throw EconomyExtractionInvalidResponseException(
+                exception, "validation", exception.code, "proposals[$index].${exception.fieldPath}",
+            )
         }
     }
 }

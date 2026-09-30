@@ -33,9 +33,9 @@ class EconomyFactProposalServiceTest {
     @Test fun `validates indicator structure and source evidence passage`() {
         val document = document("Evidence passage")
         val service = EconomyFactProposalService(repository(), documents(document), mock(EconomyFacts::class.java), clock())
-        assertThrows<InvalidEconomyFactPublicationException> { service.create(event(document.id, "Evidence passage", eventType = EconomyEventType.INDICATOR_VALUE_REPORTED)) }
+        assertPolicyFailure("INDICATOR_MEASUREMENT_MISSING", "measurement") { service.create(event(document.id, "Evidence passage", eventType = EconomyEventType.INDICATOR_VALUE_REPORTED)) }
         assertThrows<InvalidEconomyFactProposalException> { service.create(event(document.id, "Missing")) }
-        assertThrows<InvalidEconomyFactPublicationException> { service.create(event(document.id, " ")) }
+        assertPolicyFailure("EVIDENCE_TEXT_EMPTY", "evidenceText") { service.create(event(document.id, " ")) }
     }
 
     @Test fun `stores a valid indicator structure`() {
@@ -64,7 +64,7 @@ class EconomyFactProposalServiceTest {
         val longEvidence = "e".repeat(2_001)
         val longDocument = document(longEvidence)
         val longService = EconomyFactProposalService(repository(), documents(longDocument), mock(EconomyFacts::class.java), clock())
-        assertThrows<InvalidEconomyFactPublicationException> { longService.create(event(longDocument.id, longEvidence)) }
+        assertPolicyFailure("EVIDENCE_TEXT_TOO_LONG", "evidenceText") { longService.create(event(longDocument.id, longEvidence)) }
         assertThrows<InvalidEconomyFactPublicationException> {
             service.create(event(document.id, "Evidence passage", entities = listOf(EconomyEntityReference("x".repeat(256), EconomyEntityType.COMPANY))))
         }
@@ -111,6 +111,11 @@ class EconomyFactProposalServiceTest {
         geography: EconomyGeography? = null,
         entities: List<EconomyEntityReference> = emptyList(),
     ) = CreateEconomyFactProposal(id, statement, EconomyCategory.MONETARY_POLICY, eventType, geography = geography, entities = entities, measurement = measurement, referencePeriod = period, evidenceText = evidence)
+    private fun assertPolicyFailure(code: String, path: String, action: () -> Unit) {
+        val failure = assertThrows<InvalidEconomyFactPublicationException> { action() }
+        assertEquals(code, failure.code)
+        assertEquals(path, failure.fieldPath)
+    }
     private fun clock() = Clock.fixed(Instant.parse("2026-09-10T00:00:00Z"), ZoneOffset.UTC)
     private fun document(text: String) = FetchedSourceDocument(UUID.randomUUID(), "https://example.org/source", text, "a".repeat(64), Instant.EPOCH, "News", CandidateSourceType.NEWS_REPORT)
     private fun documents(document: FetchedSourceDocument) = object : SourceDocuments {
