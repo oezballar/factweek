@@ -9,9 +9,13 @@ import dev.factweek.ingestion.internal.CandidatePersistenceService
 import dev.factweek.ingestion.internal.SourceContentFetchResult
 import dev.factweek.ingestion.internal.SourceContentFailureReason
 import dev.factweek.ingestion.internal.SourceDocumentPersistenceService
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -193,6 +197,33 @@ class EconomyProposalExtractionIntegrationTest {
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("secret article text"))))
         assertEquals(before, proposalCounts())
+    }
+
+    @Test
+    fun `diagnostic records safe types but no exception content or secrets`() {
+        val id = fetched()
+        classify(id, "economy")
+        val logger = LoggerFactory.getLogger(EconomyProposalExtractionService::class.java) as Logger
+        val appender = ListAppender<ILoggingEvent>()
+        appender.start()
+        logger.addAppender(appender)
+        try {
+            client.failure = IllegalStateException("ARTICLE_MARKER", IllegalArgumentException("API_KEY_MARKER"))
+            mvc.perform(extract(id)).andExpect(status().isBadGateway)
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("ARTICLE_MARKER"))))
+            val events = appender.list.filter { it.formattedMessage.contains("economy_extraction_failed") }
+            assertEquals(1, events.size)
+            val event = events.single()
+            assertTrue(event.formattedMessage.contains("documentId=$id"))
+            assertTrue(event.formattedMessage.contains("phase=provider"))
+            assertTrue(event.formattedMessage.contains("IllegalStateException,IllegalArgumentException"))
+            assertFalse(event.formattedMessage.contains("ARTICLE_MARKER"))
+            assertFalse(event.formattedMessage.contains("API_KEY_MARKER"))
+            assertNull(event.throwableProxy)
+        } finally {
+            logger.detachAppender(appender)
+            appender.stop()
+        }
     }
 
     private fun extract(id: UUID) = post("/api/v1/economy/fact-proposals/extractions/{sourceDocumentId}", id)
