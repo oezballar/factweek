@@ -13,23 +13,30 @@ internal class OpenAiEconomyProposalStructuredOutput : BeanOutputConverter<OpenA
             {
               "type": "object", "additionalProperties": false,
               "properties": {
-                "proposals": {"type": "array", "items": {
+                "proposals": {"type": "array", "maxItems": 5, "items": {
                   "type": "object", "additionalProperties": false,
                   "properties": {
                     "statement": {"type": "string"},
                     "category": {"type": "string", "enum": [${EconomyCategory.entries.jsonValues()}]},
                     "eventType": {"type": "string", "enum": [${EconomyEventType.entries.jsonValues()}]},
-                    "occurredOn": {"type": ["string", "null"]},
+                    "occurredOn": {"anyOf": [{"type": "string", "format": "date"}, {"type": "null"}]},
                     "referencePeriod": {"type": ["object", "null"], "additionalProperties": false,
                       "properties": {
-                        "from": {"type": "string"}, "to": {"type": "string"},
+                        "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"},
                         "granularity": {"type": "string", "enum": [${EconomyReferencePeriodGranularity.entries.jsonValues()}]}
                       }, "required": ["from", "to", "granularity"]},
-                    "geography": {"type": ["object", "null"], "additionalProperties": false,
-                      "properties": {
-                        "kind": {"type": "string", "enum": [${EconomyGeographyKind.entries.jsonValues()}]},
-                        "name": {"type": "string"}, "code": {"type": ["string", "null"]}
-                      }, "required": ["kind", "name", "code"]},
+                    "geography": {"anyOf": [
+                      {"type": "null"},
+                      {"type": "object", "additionalProperties": false,
+                        "properties": {"kind": {"type": "string", "enum": ["COUNTRY"]}, "name": {"type": "string"}, "code": {"type": "string"}},
+                        "required": ["kind", "name", "code"]},
+                      {"type": "object", "additionalProperties": false,
+                        "properties": {"kind": {"type": "string", "enum": ["REGION"]}, "name": {"type": "string"}, "code": {"type": ["string", "null"]}},
+                        "required": ["kind", "name", "code"]},
+                      {"type": "object", "additionalProperties": false,
+                        "properties": {"kind": {"type": "string", "enum": ["GLOBAL"]}, "name": {"type": "string"}, "code": {"type": "null"}},
+                        "required": ["kind", "name", "code"]}
+                    ]},
                     "measurement": {"type": ["object", "null"], "additionalProperties": false,
                       "properties": {
                         "value": {"type": "string"},
