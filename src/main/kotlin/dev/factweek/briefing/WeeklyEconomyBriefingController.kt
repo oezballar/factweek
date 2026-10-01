@@ -22,6 +22,21 @@ internal class WeeklyEconomyBriefingController(
         return briefing.current(categories.orEmpty(), maximum)
     }
 
+    @GetMapping("/api/v1/briefings/economy")
+    fun between(
+        @RequestParam(required = false) from: String?,
+        @RequestParam(required = false) to: String?,
+        @RequestParam(required = false) categories: Set<EconomyCategory>?,
+        @RequestParam(defaultValue = "10") maximum: Int,
+    ): CurrentEconomyBriefing {
+        val (start, end) = BriefingWindow.requestedDates(from, to)
+        return briefing.between(start, end, categories.orEmpty(), maximum)
+    }
+
+    @ExceptionHandler(InvalidBriefingWindowException::class)
+    fun invalidWindow(error: InvalidBriefingWindowException): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, error.message ?: "Invalid briefing window")
+
     @ExceptionHandler(InvalidWeeklyEconomyBriefingRequestException::class, TypeMismatchException::class)
     fun invalid(): ProblemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid economy briefing request")
