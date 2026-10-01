@@ -143,6 +143,8 @@ curl 'http://localhost:8080/api/v1/briefings/technology/current'
 
 `current` is a rolling seven-calendar-day window, not an ISO calendar week: it includes today and the preceding six calendar days. For example, a Sunday request covers Monday through Sunday. The endpoint returns facts and transparent selection metadata only; it does not generate narrative text. `maximum` defaults to `10` and accepts values from `1` through `50`.
 
+Use `GET /api/v1/briefings/technology?from=2026-09-21&to=2026-09-27` for an explicit inclusive seven-day reference window. The dates may start on any weekday. This endpoint accepts the same repeated `categories` and `maximum` filters as `/current` and returns the same response fields, with `generatedAt` set when the response is created. Missing or invalid ISO dates, reversed dates, and windows other than seven calendar days return HTTP 400 as `application/problem+json`.
+
 `occurredOn` remains exclusively the date on which the asserted event happened. Each source may additionally carry `publishedAt`, the publication timestamp of that concrete source. Discovery and fetch timestamps are technical ingestion metadata and are never substituted for either value. Briefing selection prefers `occurredOn`; only when it is unknown does it use the earliest reliable source `publishedAt` (as a UTC calendar date). Each briefing item exposes `referenceDate` and `referenceDateBasis`; facts with neither value are not assigned to a dated briefing.
 
 Request a smaller result set without category filtering:
@@ -223,6 +225,8 @@ curl -X POST 'http://localhost:8080/api/v1/economy/facts' \
 ## Economy briefing
 
 `GET /api/v1/briefings/economy/current` returns a factual rolling seven-calendar-day selection. It accepts `maximum` (`1..50`, default `10`) and repeated `categories` parameters. Selection prefers `occurredOn`; when it is absent, it uses the earliest known `sources[].publishedAt` as a UTC calendar date. `referencePeriod` never determines briefing inclusion. Facts without either an event date or a source publication time are excluded. Each flat item exposes `referenceDate` and `referenceDateBasis`; the endpoint adds no narrative or forecasts.
+
+`GET /api/v1/briefings/economy?from=2026-09-21&to=2026-09-27` selects an explicit inclusive seven-day reference window with the same filters and response format. Both explicit endpoints query the currently published Fact inventory for the requested reference dates; they do not reconstruct a historical database snapshot. A Fact accepted later can therefore appear in an earlier reference window. Proposals never appear directly.
 
 ```bash
 curl 'http://localhost:8080/api/v1/briefings/economy/current?categories=PRICES_AND_INFLATION&maximum=5'

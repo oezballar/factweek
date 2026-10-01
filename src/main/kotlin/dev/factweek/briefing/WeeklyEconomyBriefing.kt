@@ -12,8 +12,15 @@ class WeeklyEconomyBriefing(
     private val clock: Clock,
 ) {
     fun current(categories: Set<EconomyCategory>, maximum: Int): CurrentEconomyBriefing {
+        return select(BriefingWindow.current(clock), categories, maximum)
+    }
+
+    fun between(from: java.time.LocalDate, to: java.time.LocalDate, categories: Set<EconomyCategory>, maximum: Int): CurrentEconomyBriefing {
+        return select(BriefingWindow.explicit(from, to, clock), categories, maximum)
+    }
+
+    private fun select(window: BriefingWindow, categories: Set<EconomyCategory>, maximum: Int): CurrentEconomyBriefing {
         if (maximum !in 1..50) throw InvalidWeeklyEconomyBriefingRequestException()
-        val window = BriefingWindow.current(clock)
         val appliedCategories = categories.ifEmpty { EconomyCategory.entries.toSet() }.sortedBy { it.name }
         val facts = economyFacts.relevantForBriefingBetween(window.from, window.to)
             .asSequence()
