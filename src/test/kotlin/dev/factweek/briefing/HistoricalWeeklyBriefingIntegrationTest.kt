@@ -159,6 +159,78 @@ class HistoricalWeeklyBriefingIntegrationTest {
         }
     }
 
+    @Test
+    fun `combined markdown matches JSON selection and serves a download`() {
+        economyFact("Economy older", LocalDate.parse("2026-09-21"))
+        economyFact("Economy newer", LocalDate.parse("2026-09-27"))
+        technologyFact("Technology older", LocalDate.parse("2026-09-21"))
+        technologyFact("Technology newer", LocalDate.parse("2026-09-27"))
+
+        val path = "/api/v1/briefings/weekly.md"
+        val default = mvc.perform(get(path).param("from", "2026-09-21").param("to", "2026-09-27"))
+            .andExpect(status().isOk).andReturn().response
+        assertEquals("text/markdown;charset=UTF-8", default.contentType)
+        assertEquals("attachment; filename=\"factweek-2026-09-21_2026-09-27.md\"", default.getHeader("Content-Disposition"))
+        assertEquals(idsInOrder(response("economy")), markdownIds(default.contentAsString, "Wirtschaft"))
+        assertEquals(idsInOrder(response("technology")), markdownIds(default.contentAsString, "Technologie"))
+        assertEquals(2, markdownIds(default.contentAsString, "Wirtschaft").size)
+        assertEquals(2, markdownIds(default.contentAsString, "Technologie").size)
+        assertEquals(true, default.contentAsString.contains("Limit je Ressort: 10"))
+        assertEquals(true, default.contentAsString.contains("2026-09-27T12:00:00Z (UTC)"))
+
+        val limited = mvc.perform(get(path).param("from", "2026-09-21").param("to", "2026-09-27")
+            .param("maximumPerSection", "1")).andExpect(status().isOk).andReturn().response.contentAsString
+        assertEquals(idsInOrder(response("economy", "from=2026-09-21&to=2026-09-27&maximum=1")), markdownIds(limited, "Wirtschaft"))
+        assertEquals(idsInOrder(response("technology", "from=2026-09-21&to=2026-09-27&maximum=1")), markdownIds(limited, "Technologie"))
+        assertEquals(true, limited.contains("Wirtschaft 1, Technologie 1; Limit je Ressort: 1"))
+
+        mvc.perform(get(path).param("from", "2026-09-22").param("to", "2026-09-28")
+            .param("maximumPerSection", "50")).andExpect(status().isOk)
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Limit je Ressort: 50")))
+    }
+
+    @Test
+    fun `combined markdown validates window and per-section limit as problem detail`() {
+        val path = "/api/v1/briefings/weekly.md"
+        val invalid = listOf(
+            emptyMap(), mapOf("from" to "2026-09-21"), mapOf("to" to "2026-09-27"),
+            mapOf("from" to "2026-02-30", "to" to "2026-03-07"),
+            mapOf("from" to "2026-09-27", "to" to "2026-09-21"),
+            mapOf("from" to "2026-09-21", "to" to "2026-09-26"),
+            mapOf("from" to "2026-09-21", "to" to "2026-09-28"),
+        )
+        for (params in invalid) {
+            val request = get(path)
+            params.forEach { (key, value) -> request.param(key, value) }
+            mvc.perform(request).andExpect(status().isBadRequest)
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").isNotEmpty)
+        }
+        for (maximum in listOf("0", "51", "not-a-number")) {
+            mvc.perform(get(path).param("from", "2026-09-21").param("to", "2026-09-27")
+                .param("maximumPerSection", maximum)).andExpect(status().isBadRequest)
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").isNotEmpty)
+        }
+    }
+
+    @Test
+    fun `combined markdown returns a document for an empty window`() {
+        val body = mvc.perform(get("/api/v1/briefings/weekly.md")
+            .param("from", "2026-09-21").param("to", "2026-09-27"))
+            .andExpect(status().isOk).andReturn().response.contentAsString
+        assertEquals(2, "Keine veröffentlichten Facts für dieses Zeitfenster gefunden.".toRegex().findAll(body).count())
+        assertEquals(emptyList<String>(), markdownIds(body, "Wirtschaft"))
+        assertEquals(emptyList<String>(), markdownIds(body, "Technologie"))
+    }
+
+    private fun idsInOrder(response: JsonNode): List<String> = response["facts"].valueStream().toList().map { it["id"].asString() }
+
+    private fun markdownIds(markdown: String, section: String): List<String> =
+        Regex("(?m)^\\| $section \\| ([0-9a-f-]{36}) \\|").findAll(markdown).map { it.groupValues[1] }.toList()
+
     private fun economyFact(statement: String, occurredOn: LocalDate?, publishedAt: String? = "2026-09-24T12:00:00Z"): String =
         economy.publish(PublishEconomyFact(
             statement = statement, category = EconomyCategory.MONETARY_POLICY,
