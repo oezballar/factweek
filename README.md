@@ -228,6 +228,16 @@ curl -X POST 'http://localhost:8080/api/v1/economy/facts' \
 
 `GET /api/v1/briefings/economy?from=2026-09-21&to=2026-09-27` selects an explicit inclusive seven-day reference window with the same filters and response format. Both explicit endpoints query the currently published Fact inventory for the requested reference dates; they do not reconstruct a historical database snapshot. A Fact accepted later can therefore appear in an earlier reference window. Proposals never appear directly.
 
+## Combined weekly Markdown download
+
+`GET /api/v1/briefings/weekly.md?from=2026-09-21&to=2026-09-27` combines the published Economy and Technology Facts for one inclusive seven-day reference window. `from` and `to` are required ISO dates; the window may begin on any weekday. `maximumPerSection` defaults to `10` and accepts `1..50`, separately for each department. No category filter is applied. The response is `text/markdown;charset=UTF-8` with an attachment filename derived from the dates.
+
+```bash
+curl -fS -OJ 'http://localhost:8080/api/v1/briefings/weekly.md?from=2026-09-21&to=2026-09-27&maximumPerSection=10'
+```
+
+The Markdown preserves stored statements verbatim in their original language; it does not translate or generate narrative summaries. It shows the current published Fact inventory for the requested reference dates, not a historical database snapshot. Selection prefers `occurredOn`, then the earliest source publication date in UTC. An Economy measurement period can lie outside the requested week. The document reports its generation time, per-department counts and limit; it makes no claim of complete news coverage. Missing or invalid dates, a reversed or non-seven-day window, and invalid `maximumPerSection` values return HTTP 400 as `application/problem+json`.
+
 ```bash
 curl 'http://localhost:8080/api/v1/briefings/economy/current?categories=PRICES_AND_INFLATION&maximum=5'
 ```
