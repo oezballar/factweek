@@ -4,6 +4,7 @@ import dev.factweek.economy.EconomyMeasurement
 import dev.factweek.provenance.SourceReference
 import org.springframework.stereotype.Component
 import java.net.URI
+import java.net.URISyntaxException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -110,6 +111,8 @@ class WeeklyMarkdownRenderer {
             it.scheme?.lowercase(Locale.ROOT) in setOf("http", "https") &&
                 !it.host.isNullOrBlank() && it.userInfo == null
         }?.toASCIIString()
+    } catch (_: URISyntaxException) {
+        null
     } catch (_: IllegalArgumentException) {
         null
     }

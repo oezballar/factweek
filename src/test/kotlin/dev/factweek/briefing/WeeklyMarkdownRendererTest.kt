@@ -85,6 +85,21 @@ class WeeklyMarkdownRendererTest {
         assertFalse(result.contains("<script>"))
     }
 
+    @Test
+    fun `renders malformed source URL as unlinked code and keeps valid source`() {
+        val fact = economyFact().copy(sources = listOf(
+            SourceReference("https://example.org/%ZZ", "Malformed", SourceType.NEWS_REPORT, now),
+            SourceReference("https://example.org/valid", "Valid", SourceType.PRIMARY_DOCUMENT, now),
+        ))
+
+        val result = renderer.render(from, to, now, 10, listOf(fact), emptyList())
+
+        assertTrue(result.contains("Economy statement\\."))
+        assertTrue(result.contains("Malformed (Original-URL, nicht verlinkt: ` https://example.org/%ZZ `)"))
+        assertFalse(result.contains("](<https://example.org/%ZZ>)"))
+        assertTrue(result.contains("[Valid](<https://example.org/valid>)"))
+    }
+
     private fun economyFact() = BriefingEconomyFact(
         UUID.fromString("00000000-0000-0000-0000-000000000001"), "Economy statement.",
         EconomyCategory.MACROECONOMIC_ACTIVITY, EconomyEventType.INDICATOR_VALUE_REPORTED,
